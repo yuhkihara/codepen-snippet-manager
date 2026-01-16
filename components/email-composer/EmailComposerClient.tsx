@@ -38,20 +38,20 @@ export default function EmailComposerClient({ template, snippets }: EmailCompose
 
       {/* メインコンテンツエリア（3画面レイアウト） */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* 左: スニペット一覧 */}
-        <div className="w-full lg:w-72 xl:w-80 border-r border-gray-200 overflow-y-auto bg-white">
+        {/* 左: スニペット一覧（固定幅・縮小不可） */}
+        <div className="w-full lg:w-64 xl:w-72 2xl:w-80 flex-shrink-0 border-r border-gray-200 overflow-y-auto bg-white">
           <SnippetsSidebar snippets={snippets} />
         </div>
 
         {/* モバイル: 縦並び / デスクトップ: 横並び */}
-        <div className="flex-1 flex flex-col lg:flex-row">
+        <div className="flex-1 flex flex-col lg:flex-row min-w-0">
           {/* ビジュアルエディター（旧: プレビュー） */}
-          <div className="h-80 lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-hidden">
+          <div className="h-80 lg:h-auto lg:flex-1 border-b lg:border-b-0 lg:border-r border-gray-200 overflow-hidden min-w-0">
             <VisualPreviewEditor />
           </div>
 
           {/* コードエディタ */}
-          <div className="flex-1 lg:flex-1 overflow-hidden">
+          <div className="flex-1 lg:flex-1 overflow-hidden min-w-0">
             <EmailCodeEditor />
           </div>
         </div>
