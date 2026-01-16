@@ -232,6 +232,43 @@
   - #メール タグの自動付与
   - 新規スニペットとして保存
 
+## Phase 10: ビジュアルエディター機能 ✅ (NEW - 2026-01-17)
+> **仕様書:** [`visual-editor-spec.md`](visual-editor-spec.md)
+
+### フェーズ概要
+メールプレビュー上でコンポーネントを直感的に操作できるビジュアルエディター。
+
+### 実装状況
+
+#### コア機能 ✅
+- ✅ `components/email-composer/VisualPreviewEditor.tsx` (ビジュアルエディター本体)
+- ✅ コンポーネント選択（クリックで選択、青色リング表示）
+- ✅ ドラッグ&ドロップ並び替え（@dnd-kit/core, @dnd-kit/sortable）
+- ✅ インラインテキスト編集（@tiptap/react）
+- ✅ スニペット追加（サイドバーからD&D）
+- ✅ コンポーネント削除（ゴミ箱アイコン + 確認ダイアログ）
+- ✅ Undo/Redo（Cmd+Z / Cmd+Shift+Z）
+
+#### Store拡張 ✅
+- ✅ `store/emailComposerStore.ts` - AST構造対応
+  - ✅ `components: Record<string, ComponentNode>` - コンポーネント管理
+  - ✅ `componentOrder: string[]` - 順序管理
+  - ✅ `history: { past, future }` - 履歴管理（最大50エントリ）
+  - ✅ `selectedComponentId` - 選択状態
+  - ✅ `editingField` - 編集中フィールド
+
+#### UI/UX ✅
+- ✅ 3カラムレイアウト（スニペット一覧 | ビジュアルエディター | コードエディター）
+- ✅ Shadow DOMによるスタイル分離
+- ✅ ドラッグ中のビジュアルフィードバック
+- ✅ memo()によるパフォーマンス最適化
+
+#### デモページ ✅
+- ✅ `app/test/composer/page.tsx` - 認証不要のデモページ
+
+#### セキュリティ ✅
+- ✅ **Shadow DOM内のHTMLサニタイズ** - `VisualPreviewEditor.tsx:118-122`で`sanitizeHTML()`を使用（2026-01-17修正）
+
 ### 🔧 オプション機能（将来実装）
 - ❌ CSS/JSエディタ (テーブル構造は対応済み)
 - ❌ リビジョン履歴 (テーブル構造は対応済み)
@@ -449,10 +486,11 @@
 
 | ドキュメント | 内容 | 最終更新 |
 |------------|------|---------|
-| [codepen_html.md](./codepen_html.md) | 完全な実装仕様書（SSOT） | 2025-11-17 |
+| [codepen_html.md](./codepen_html.md) | 完全な実装仕様書（SSOT） | 2026-01-17 |
 | [implementation_plan.md](./implementation_plan.md) | フェーズ別実装計画 | 2025-11-17 |
 | [architecture-diagram.md](./architecture-diagram.md) | システム構成とデータフロー | 2025-11-17 |
 | [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2025-11-17 |
+| [visual-editor-spec.md](./visual-editor-spec.md) | ビジュアルエディター機能の詳細仕様 | 2026-01-17 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
 | [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
@@ -460,4 +498,4 @@
 ---
 
 **Last Updated**: 2026-01-17
-**Update**: Documentation restructured, links fixed
+**Update**: Added Phase 10 (Visual Editor), updated documentation links

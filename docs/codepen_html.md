@@ -5,6 +5,7 @@
 > - [実装計画](./implementation_plan.md) - フェーズ別実装計画
 > - [アーキテクチャ図](./architecture-diagram.md) - システム構成とデータフロー
 > - [メールコンポーザー仕様書](./email-composer-spec.md) - HTMLメール作成機能の詳細仕様
+> - [ビジュアルエディター仕様書](./visual-editor-spec.md) - ドラッグ&ドロップビジュアル編集機能
 > - [トラブルシューティング](./TROUBLESHOOTING.md) - 問題解決ガイド
 > - [プロジェクトREADME](../README.md) - プロジェクト全体概要
 > - [監査レポート](./audits/) - コード監査結果
@@ -815,6 +816,80 @@ useEffect(() => {
 
 ---
 
+## ビジュアルエディター機能（2026-01-17実装）
+
+### 概要
+
+メールプレビュー上でコンポーネントを直感的に操作できるビジュアルエディター。
+
+> **詳細仕様書**: [visual-editor-spec.md](./visual-editor-spec.md) を参照
+
+### 主な機能
+
+| 機能 | 説明 |
+|------|------|
+| コンポーネント選択 | クリックで選択、青色リング表示 |
+| ドラッグ&ドロップ並び替え | dnd-kitによるコンポーネント順序変更 |
+| インラインテキスト編集 | TipTapエディターで`data-editable`要素を編集 |
+| スニペット追加 | サイドバーからD&Dで挿入 |
+| コンポーネント削除 | ゴミ箱アイコンで削除 |
+| Undo/Redo | Cmd+Z / Cmd+Shift+Z |
+
+### 技術スタック
+
+- **ドラッグ&ドロップ**: @dnd-kit/core, @dnd-kit/sortable
+- **リッチテキスト編集**: @tiptap/react
+- **状態管理**: Zustand + immer（AST構造でコンポーネント管理）
+- **スタイル分離**: Shadow DOM
+
+### 新規/更新ファイル
+
+**新規:**
+- `components/email-composer/VisualPreviewEditor.tsx` - ビジュアルエディター本体
+- `app/test/composer/page.tsx` - デモページ（認証不要）
+
+**更新:**
+- `store/emailComposerStore.ts` - AST構造対応、履歴管理追加
+- `components/email-composer/EmailComposerClient.tsx` - 3カラムレイアウト
+- `components/email-composer/EmailCodeEditor.tsx` - Store同期強化
+
+### Store拡張（emailComposerStore.ts）
+
+```typescript
+interface EmailComposerStore {
+  // AST構造
+  components: Record<string, ComponentNode>;
+  componentOrder: string[];
+
+  // ビジュアル編集状態
+  selectedComponentId: string | null;
+  editingField: { componentId: string; fieldName: string } | null;
+
+  // 履歴（Undo/Redo）
+  history: { past: HistoryEntry[]; future: HistoryEntry[] };
+}
+```
+
+### セキュリティ要件
+
+**重要**: VisualPreviewEditor.tsx内のShadow DOM描画では`sanitizeHTML()`を使用すること。
+
+```tsx
+// ✅ 正しい実装
+shadow.innerHTML = `
+  <style>${styleContent}</style>
+  <div class="component-content">${sanitizeHTML(html)}</div>
+`;
+
+// ❌ 危険な実装
+shadow.innerHTML = `
+  <style>${styleContent}</style>
+  <div class="component-content">${html}</div>
+`;
+```
+
+---
+
 ## 追加ユーティリティ（2025-11-17実装）
 
 ### lib/formatDate.ts
@@ -927,10 +1002,11 @@ npm run dev
 
 | ドキュメント | 内容 | 最終更新 |
 |------------|------|---------|
-| [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) | 実装進捗とリリース判定 | 2025-11-17 |
+| [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) | 実装進捗とリリース判定 | 2026-01-17 |
 | [implementation_plan.md](./implementation_plan.md) | フェーズ別実装計画 | 2025-11-17 |
 | [architecture-diagram.md](./architecture-diagram.md) | システム構成とデータフロー | 2025-11-17 |
 | [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2025-11-17 |
+| [visual-editor-spec.md](./visual-editor-spec.md) | ビジュアルエディター機能の詳細仕様 | 2026-01-17 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
 | [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
@@ -938,4 +1014,4 @@ npm run dev
 ---
 
 **Last Updated**: 2026-01-17
-**Update**: Documentation restructured, links fixed
+**Update**: Added visual editor section, updated documentation links

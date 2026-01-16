@@ -115,9 +115,10 @@ const SortableComponent = memo(function SortableComponent({
       html = doc.body.innerHTML;
     });
 
+    // XSS防止: HTMLをサニタイズしてから挿入
     shadow.innerHTML = `
       <style>${styleContent}</style>
-      <div class="component-content">${html}</div>
+      <div class="component-content">${sanitizeHTML(html)}</div>
     `;
 
     // ダブルクリックイベント
