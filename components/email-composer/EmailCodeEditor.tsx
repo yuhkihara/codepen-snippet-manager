@@ -31,33 +31,43 @@ export default function EmailCodeEditor() {
       return;
     }
 
-    const model = editorRef.current.getModel();
+    const editor = editorRef.current;
+    const model = editor.getModel();
     if (!model) return;
 
     const html = getHtml();
     const currentValue = model.getValue();
 
     if (currentValue !== html) {
-      // カーソル位置を保存
-      const position = editorRef.current.getPosition();
-      const scrollTop = editorRef.current.getScrollTop();
+      // カーソル位置とスクロール位置を保存
+      const position = editor.getPosition();
+      const scrollTop = editor.getScrollTop();
+      const scrollLeft = editor.getScrollLeft();
 
-      // 全体を置換
-      model.pushEditOperations(
-        [],
-        [{ range: model.getFullModelRange(), text: html }],
-        () => null
-      );
+      // 更新をバッチ処理してスクロールジャンプを防止
+      editor.executeEdits('external-update', [{
+        range: model.getFullModelRange(),
+        text: html,
+        forceMoveMarkers: false,
+      }]);
 
-      // カーソル位置を復元
-      if (position) {
+      // 次のフレームでカーソル位置とスクロール位置を復元
+      requestAnimationFrame(() => {
+        if (!editorRef.current) return;
         const lineCount = model.getLineCount();
-        editorRef.current.setPosition({
-          lineNumber: Math.min(position.lineNumber, lineCount),
-          column: position.column,
-        });
-      }
-      editorRef.current.setScrollTop(scrollTop);
+
+        // カーソル位置を復元
+        if (position) {
+          editorRef.current.setPosition({
+            lineNumber: Math.min(position.lineNumber, lineCount),
+            column: position.column,
+          });
+        }
+
+        // スクロール位置を復元
+        editorRef.current.setScrollTop(scrollTop);
+        editorRef.current.setScrollLeft(scrollLeft);
+      });
     }
 
     lastSyncedSeqRef.current = updateSeq;

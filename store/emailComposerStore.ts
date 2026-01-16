@@ -117,29 +117,38 @@ interface EmailComposerStore {
 const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'td', 'th', 'li', 'label'];
 
 /**
- * テキスト要素に自動でdata-editable属性を付与
+ * テキスト要素に自動でdata-editable属性を付与（HTML文字列を直接操作）
  * 既にdata-editableがある要素はスキップ
+ * DOMParserのinnerHTMLによるフォーマット変更を避けるため、正規表現で属性を追加
  */
-function addAutoEditableAttributes(doc: Document, componentId: string): void {
+function addAutoEditableAttributesToHtml(html: string, componentId: string): string {
   let editableIndex = 0;
+  let result = html;
 
+  // 各対象タグに対して処理
   AUTO_EDITABLE_TAGS.forEach((tag) => {
-    doc.querySelectorAll(tag).forEach((el) => {
+    // タグの開始タグを検索（既にdata-editableがないもの）
+    const tagRegex = new RegExp(
+      `<${tag}(\\s[^>]*)?(?<!data-editable[^>]*)>([^<]*)</${tag}>`,
+      'gi'
+    );
+
+    result = result.replace(tagRegex, (match, attrs, content) => {
       // 既にdata-editableがある場合はスキップ
-      if (el.hasAttribute('data-editable')) return;
-
-      // 子要素にテキストノードがある場合のみ対象
-      const hasDirectText = Array.from(el.childNodes).some(
-        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()
-      );
-
-      // テキストがある場合、または子要素がなくinnerTextがある場合
-      if (hasDirectText || (el.children.length === 0 && el.textContent?.trim())) {
-        const fieldName = `field-${componentId.slice(0, 8)}-${editableIndex++}`;
-        el.setAttribute('data-editable', fieldName);
+      if (attrs && /data-editable/.test(attrs)) {
+        return match;
       }
+      // テキストコンテンツがない場合はスキップ
+      if (!content || !content.trim()) {
+        return match;
+      }
+      const fieldName = `field-${componentId.slice(0, 8)}-${editableIndex++}`;
+      const newAttrs = attrs ? `${attrs} data-editable="${fieldName}"` : ` data-editable="${fieldName}"`;
+      return `<${tag}${newAttrs}>${content}</${tag}>`;
     });
   });
+
+  return result;
 }
 
 /**
@@ -152,34 +161,31 @@ function parseComponentFromHtml(
   snippetId?: string,
   autoAddEditable: boolean = false
 ): ComponentNode {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-
-  // スニペットから追加された場合は自動でdata-editableを付与
+  // スニペットから追加された場合は自動でdata-editableを付与（HTML文字列を直接操作）
+  let processedHtml = html;
   if (autoAddEditable || snippetId) {
-    addAutoEditableAttributes(doc, id);
+    processedHtml = addAutoEditableAttributesToHtml(html, id);
   }
 
-  // data-editable要素を抽出
+  // data-editable要素を抽出（読み取り専用でDOMを使用）
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(processedHtml, 'text/html');
+
   const editableFields: Record<string, EditableField> = {};
   doc.querySelectorAll('[data-editable]').forEach((el) => {
     const name = el.getAttribute('data-editable')!;
-    // innerTextで改行を保持
     editableFields[name] = {
       name,
       value: el.textContent || '',
     };
   });
 
-  // 自動付与後のHTMLを取得
-  const updatedHtml = autoAddEditable || snippetId ? doc.body.innerHTML : html;
-
   return {
     id,
     type: snippetId ? 'snippet' : 'template',
     sourceSnippetId: snippetId,
     editableFields,
-    innerHtml: updatedHtml,
+    innerHtml: processedHtml,  // 元のHTMLフォーマットを保持
   };
 }
 
