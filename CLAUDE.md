@@ -19,39 +19,73 @@ CodePen-style HTML snippet management application built with Next.js 15, Supabas
 - **Validation**: Zod
 - **Security**: DOMPurify (isomorphic-dompurify)
 
-## Documentation Rules
+## File Location Rules (STRICT)
 
-### File Location Rules (STRICT)
+### Root Directory Structure
 
-**Root directory (`/`) may only contain:**
-- `README.md` - Project overview and quick start
-- `CLAUDE.md` - This file (AI assistant instructions)
+Root (`/`) contains only essential files required by frameworks/tools:
 
-**All other documentation MUST be in `/docs`:**
+| File | Required By | Purpose |
+|------|-------------|---------|
+| `README.md` | - | Project overview (user-facing) |
+| `CLAUDE.md` | - | AI assistant instructions |
+| `package.json` | npm | Dependencies |
+| `package-lock.json` | npm | Lock file |
+| `next.config.js` | Next.js | Framework config |
+| `tsconfig.json` | TypeScript | TS config |
+| `tailwind.config.ts` | Tailwind | Styling config |
+| `postcss.config.js` | PostCSS | CSS processing |
+| `middleware.ts` | Next.js | Auth middleware |
+| `.eslintrc.json` | ESLint | Linting rules |
+| `.gitignore` | Git | Ignore patterns |
+| `.env.local.example` | - | Env template |
+
+**DO NOT add new files to root.** Place them in appropriate directories.
+
+### Documentation Rules
+
+**All documentation MUST be in `/docs`:**
 - Technical specifications
 - Implementation guides
 - Architecture diagrams
 - Troubleshooting guides
 - Audit reports (in `/docs/audits/`)
 
-**No exceptions allowed.** If you create new documentation, place it in `/docs`.
+**No exceptions.** New documentation goes in `/docs`.
 
-### Documentation Structure
+### Complete Project Structure
 
 ```
 /
-├── README.md              # Entry point, links to /docs
-├── CLAUDE.md              # AI assistant instructions (this file)
-└── docs/
-    ├── DEVELOPMENT.md     # Development guide
-    ├── DEPLOYMENT_GUIDE.md # Deployment instructions
-    ├── IMPLEMENTATION_STATUS.md # Implementation checklist
-    ├── TROUBLESHOOTING.md # Problem resolution
-    ├── architecture-diagram.md # System architecture (Mermaid)
-    ├── codepen_html.md    # Main spec (SSOT)
-    ├── email-composer-spec.md # Email composer feature
-    ├── implementation_plan.md # Phase-based plan
-    └── audits/            # Code audit reports
+├── README.md                 # Project overview
+├── CLAUDE.md                 # AI instructions (this file)
+├── package.json              # npm (required at root)
+├── package-lock.json         # npm (required at root)
+├── next.config.js            # Next.js (required at root)
+├── tsconfig.json             # TypeScript (required at root)
+├── tailwind.config.ts        # Tailwind (required at root)
+├── postcss.config.js         # PostCSS (required at root)
+├── middleware.ts             # Next.js auth (required at root)
+├── .eslintrc.json            # ESLint (required at root)
+├── .gitignore                # Git (required at root)
+├── .env.local.example        # Env template
+├── app/                      # Next.js App Router pages
+├── components/               # React components
+├── docs/                     # All documentation
+│   ├── DEVELOPMENT.md
+│   ├── DEPLOYMENT_GUIDE.md
+│   ├── IMPLEMENTATION_STATUS.md
+│   ├── TROUBLESHOOTING.md
+│   ├── architecture-diagram.md
+│   ├── codepen_html.md       # SSOT
+│   ├── email-composer-spec.md
+│   ├── implementation_plan.md
+│   └── audits/               # Audit reports
+├── hooks/                    # Custom React hooks
+├── lib/                      # Utilities
+├── public/                   # Static assets
+├── store/                    # Zustand stores
+└── types/                    # TypeScript types
 ```
 
 ### Single Source of Truth (SSOT)
