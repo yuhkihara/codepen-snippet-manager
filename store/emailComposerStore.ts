@@ -113,8 +113,8 @@ interface EmailComposerStore {
 
 // ===== Helper Functions =====
 
-// 自動的にdata-editableを付与する対象タグ
-const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
+// 自動的にdata-editableを付与する対象タグ（子要素のないリーフ要素のみ）
+const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'td', 'th', 'li', 'label'];
 
 /**
  * テキスト要素に自動でdata-editable属性を付与

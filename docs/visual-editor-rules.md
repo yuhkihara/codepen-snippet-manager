@@ -69,15 +69,17 @@
 
 ### 2.2 対象タグ
 
-以下のタグに`data-editable`属性を付与可能:
+以下のタグに`data-editable`属性を付与可能（子要素のないリーフ要素のみ）:
 
 | カテゴリ | タグ |
 |----------|------|
 | 見出し | `h1`, `h2`, `h3`, `h4`, `h5`, `h6` |
-| 段落 | `p` |
+| ブロック | `p`, `div` |
 | インライン | `span`, `label` |
 | テーブル | `td`, `th` |
 | リスト | `li` |
+
+> **Note**: 子要素を持つ親タグには付与されません。テキストを直接含むリーフ要素のみが対象です。
 
 ### 2.3 自動付与機能
 
@@ -179,8 +181,8 @@
 const COMPONENT_MARKER = '<!--ここにコンポーネントを入れる-->';
 const COMPONENT_MARKER_END = '<!--/ここにコンポーネントを入れる-->';
 
-// 自動editable対象タグ
-const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
+// 自動editable対象タグ（子要素のないリーフ要素のみ）
+const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'td', 'th', 'li', 'label'];
 
 // 履歴
 const MAX_HISTORY_SIZE = 50;
