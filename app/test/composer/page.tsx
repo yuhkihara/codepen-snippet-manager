@@ -10,18 +10,20 @@ import { useEmailComposerStore } from '@/store/emailComposerStore';
 import VisualPreviewEditor from '@/components/email-composer/VisualPreviewEditor';
 import EmailCodeEditor from '@/components/email-composer/EmailCodeEditor';
 
-// テスト用のサンプルテンプレート
+// テスト用のサンプルテンプレート（マーカー付き）
 const SAMPLE_TEMPLATE = {
   id: 'test-template-001',
   title: 'Newsletter Template',
   category: 'marketing',
   tags: ['#template', 'newsletter'],
   html: `
+<!-- ヘッダー部分（固定） -->
 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px; text-align: center; color: white;">
-  <h1 data-editable="title" style="margin: 0 0 8px 0; font-size: 28px;">Welcome to Our Newsletter</h1>
-  <p data-editable="subtitle" style="margin: 0; opacity: 0.9;">Stay updated with the latest news</p>
+  <h1 style="margin: 0 0 8px 0; font-size: 28px;">Welcome to Our Newsletter</h1>
+  <p style="margin: 0; opacity: 0.9;">Stay updated with the latest news</p>
 </div>
 
+<!--ここにコンポーネントを入れる-->
 <div style="padding: 24px;">
   <h2 data-editable="heading" style="color: #1a202c; margin: 0 0 16px 0;">Featured Article</h2>
   <p data-editable="body" style="color: #4a5568; line-height: 1.6; margin: 0;">
@@ -31,8 +33,14 @@ const SAMPLE_TEMPLATE = {
   </p>
 </div>
 
+<div style="padding: 24px; text-align: center; background: #edf2f7;">
+  <p data-editable="middle-cta" style="color: #4a5568; margin: 0 0 16px 0;">Check out our features</p>
+</div>
+<!--/ここにコンポーネントを入れる-->
+
+<!-- フッター部分（固定） -->
 <div style="padding: 24px; text-align: center; background: #f7fafc;">
-  <p data-editable="cta-text" style="color: #4a5568; margin: 0 0 16px 0;">Ready to get started?</p>
+  <p style="color: #4a5568; margin: 0 0 16px 0;">Ready to get started?</p>
   <a href="#" style="display: inline-block; background: #4299e1; color: white; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: 600;">
     Get Started
   </a>

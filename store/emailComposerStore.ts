@@ -30,6 +30,10 @@ interface EditingState {
   fieldName: string;
 }
 
+// コンポーネント挿入マーカー
+const COMPONENT_MARKER = '<!--ここにコンポーネントを入れる-->';
+const COMPONENT_MARKER_END = '<!--/ここにコンポーネントを入れる-->';
+
 interface EmailComposerStore {
   // 基本メタデータ
   templateId: string;
@@ -37,6 +41,10 @@ interface EmailComposerStore {
   category: string;
   tags: string[];
   isDirty: boolean;
+
+  // テンプレート構造（マーカー前後のHTML）
+  headerHtml: string;
+  footerHtml: string;
 
   // AST構造によるコンポーネント管理
   components: Record<string, ComponentNode>;
@@ -175,21 +183,46 @@ function escapeHtml(text: string): string {
 
 /**
  * 生HTMLからコンポーネント構造を再構築
- * コメントマーカーがある場合はそれを使用、なければトップレベル要素ごとに分割
+ * <!--ここにコンポーネントを入れる-->マーカーがある場合はその範囲内のみをコンポーネント化
  */
 function parseHtmlToComponents(html: string): {
   components: Record<string, ComponentNode>;
   componentOrder: string[];
+  headerHtml: string;
+  footerHtml: string;
 } {
   const components: Record<string, ComponentNode> = {};
   const componentOrder: string[] = [];
+  let headerHtml = '';
+  let footerHtml = '';
+  let componentAreaHtml = html;
 
-  // コメントマーカーでコンポーネントを検出
+  // マーカーで分割
+  const startMarkerIndex = html.indexOf(COMPONENT_MARKER);
+  const endMarkerIndex = html.indexOf(COMPONENT_MARKER_END);
+
+  if (startMarkerIndex !== -1) {
+    headerHtml = html.substring(0, startMarkerIndex);
+
+    if (endMarkerIndex !== -1 && endMarkerIndex > startMarkerIndex) {
+      // 開始・終了マーカーの両方がある場合
+      componentAreaHtml = html.substring(
+        startMarkerIndex + COMPONENT_MARKER.length,
+        endMarkerIndex
+      );
+      footerHtml = html.substring(endMarkerIndex + COMPONENT_MARKER_END.length);
+    } else {
+      // 開始マーカーのみの場合は、それ以降すべてがコンポーネント領域
+      componentAreaHtml = html.substring(startMarkerIndex + COMPONENT_MARKER.length);
+    }
+  }
+
+  // コンポーネントマーカーでコンポーネントを検出
   const markerRegex = /<!-- component:([\w-]+) -->([\s\S]*?)<!-- \/component:\1 -->/g;
   let match;
   let hasMarkers = false;
 
-  while ((match = markerRegex.exec(html)) !== null) {
+  while ((match = markerRegex.exec(componentAreaHtml)) !== null) {
     hasMarkers = true;
     const [, id, innerContent] = match;
 
@@ -210,14 +243,13 @@ function parseHtmlToComponents(html: string): {
     }
   }
 
-  // マーカーがない場合はトップレベル要素ごとに分割
-  if (!hasMarkers && html.trim()) {
+  // コンポーネントマーカーがない場合はトップレベル要素ごとに分割
+  if (!hasMarkers && componentAreaHtml.trim()) {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(componentAreaHtml, 'text/html');
     const topLevelElements = doc.body.children;
 
     if (topLevelElements.length > 0) {
-      // トップレベル要素が複数ある場合は個別にコンポーネント化
       Array.from(topLevelElements).forEach((element) => {
         const id = crypto.randomUUID();
         const elementHtml = element.outerHTML;
@@ -226,17 +258,16 @@ function parseHtmlToComponents(html: string): {
         components[id] = component;
         componentOrder.push(id);
       });
-    } else {
-      // 要素がない場合（テキストのみなど）は全体を1つのコンポーネントに
+    } else if (componentAreaHtml.trim()) {
       const id = crypto.randomUUID();
-      const component = parseComponentFromHtml(html, id);
+      const component = parseComponentFromHtml(componentAreaHtml, id);
       component.type = 'template';
       components[id] = component;
       componentOrder.push(id);
     }
   }
 
-  return { components, componentOrder };
+  return { components, componentOrder, headerHtml, footerHtml };
 }
 
 // ===== Constants =====
@@ -254,6 +285,8 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     category: 'その他',
     tags: [],
     isDirty: false,
+    headerHtml: '',
+    footerHtml: '',
     components: {},
     componentOrder: [],
     selectedComponentId: null,
@@ -265,7 +298,7 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     // ===== 初期化 =====
 
     loadTemplate: (template) => {
-      const { components, componentOrder } = parseHtmlToComponents(template.html);
+      const { components, componentOrder, headerHtml, footerHtml } = parseHtmlToComponents(template.html);
 
       set((state) => {
         state.templateId = template.id;
@@ -273,6 +306,8 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         state.category = template.category;
         state.tags = template.tags || [];
         state.isDirty = false;
+        state.headerHtml = headerHtml;
+        state.footerHtml = footerHtml;
         state.components = components;
         state.componentOrder = componentOrder;
         state.selectedComponentId = null;
@@ -289,6 +324,8 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         state.category = 'その他';
         state.tags = [];
         state.isDirty = false;
+        state.headerHtml = '';
+        state.footerHtml = '';
         state.components = {};
         state.componentOrder = [];
         state.selectedComponentId = null;
@@ -477,7 +514,7 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     // ===== HTML操作 =====
 
     setHtml: (html) => {
-      const { components, componentOrder } = parseHtmlToComponents(html);
+      const { components, componentOrder, headerHtml, footerHtml } = parseHtmlToComponents(html);
 
       set((state) => {
         // 履歴に保存
@@ -494,6 +531,8 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         }
         state.history.future = [];
 
+        state.headerHtml = headerHtml;
+        state.footerHtml = footerHtml;
         state.components = components;
         state.componentOrder = componentOrder;
         state.isDirty = true;
@@ -502,14 +541,24 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     },
 
     getHtml: () => {
-      const { components, componentOrder } = get();
-      return componentOrder
+      const { components, componentOrder, headerHtml, footerHtml } = get();
+
+      // コンポーネント部分を生成
+      const componentsHtml = componentOrder
         .map((id) => {
           const component = components[id];
           if (!component) return '';
           return serializeComponent(component);
         })
         .join('\n\n');
+
+      // マーカーがある場合はheader + marker + components + marker-end + footerを返す
+      if (headerHtml || footerHtml) {
+        return `${headerHtml}${COMPONENT_MARKER}\n${componentsHtml}\n${COMPONENT_MARKER_END}${footerHtml}`;
+      }
+
+      // マーカーがない場合はコンポーネントのみ
+      return componentsHtml;
     },
 
     // 後方互換性: htmlプロパティへのアクセス

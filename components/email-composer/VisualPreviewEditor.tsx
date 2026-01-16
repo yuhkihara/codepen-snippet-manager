@@ -314,6 +314,8 @@ export default function VisualPreviewEditor() {
   const componentOrder = useEmailComposerStore((state) => state.componentOrder);
   const components = useEmailComposerStore((state) => state.components);
   const selectedComponentId = useEmailComposerStore((state) => state.selectedComponentId);
+  const headerHtml = useEmailComposerStore((state) => state.headerHtml);
+  const footerHtml = useEmailComposerStore((state) => state.footerHtml);
   const reorderComponents = useEmailComposerStore((state) => state.reorderComponents);
   const addComponent = useEmailComposerStore((state) => state.addComponent);
   const undo = useEmailComposerStore((state) => state.undo);
@@ -490,15 +492,24 @@ export default function VisualPreviewEditor() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 min-h-full">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 min-h-full overflow-hidden">
+          {/* ヘッダー部分（固定・編集不可） */}
+          {headerHtml && (
+            <div
+              className="opacity-80 pointer-events-none border-b-2 border-dashed border-gray-300"
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(headerHtml) }}
+            />
+          )}
+
+          {/* コンポーネント編集エリア */}
           {componentOrder.length === 0 ? (
-            <div className="flex items-center justify-center h-64 text-gray-400">
+            <div className="flex items-center justify-center h-64 text-gray-400 bg-blue-50/30 border-2 border-dashed border-blue-200 m-4 rounded-lg">
               <div className="text-center">
-                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                <svg className="w-16 h-16 mx-auto mb-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
-                <p className="text-lg mb-2">コンポーネントがありません</p>
-                <p className="text-sm">左のサイドバーからスニペットをドラッグ&ドロップしてください</p>
+                <p className="text-lg mb-2 text-blue-600">コンポーネント挿入エリア</p>
+                <p className="text-sm text-blue-500">左のサイドバーからスニペットをドラッグ&ドロップ</p>
               </div>
             </div>
           ) : (
@@ -512,7 +523,7 @@ export default function VisualPreviewEditor() {
                 items={componentOrder}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-4 bg-blue-50/20 min-h-[100px]">
                   {componentOrder.map((id) => (
                     <SortableComponent key={id} componentId={id} />
                   ))}
@@ -532,6 +543,14 @@ export default function VisualPreviewEditor() {
                 )}
               </DragOverlay>
             </DndContext>
+          )}
+
+          {/* フッター部分（固定・編集不可） */}
+          {footerHtml && (
+            <div
+              className="opacity-80 pointer-events-none border-t-2 border-dashed border-gray-300"
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(footerHtml) }}
+            />
           )}
         </div>
       </div>
