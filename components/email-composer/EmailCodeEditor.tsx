@@ -1,20 +1,69 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useEmailComposerStore } from '@/store/emailComposerStore';
 import { toast } from 'sonner';
 
 export default function EmailCodeEditor() {
-  const { html, setHtml } = useEmailComposerStore();
+  const getHtml = useEmailComposerStore((state) => state.getHtml);
+  const setHtml = useEmailComposerStore((state) => state.setHtml);
+  const addComponent = useEmailComposerStore((state) => state.addComponent);
+  const updateSeq = useEmailComposerStore((state) => state.updateSeq);
+
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const lastCursorPositionRef = useRef<{ lineNumber: number; column: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
   const isDraggingRef = useRef(false);
+  const lastSyncedSeqRef = useRef(0);
+  const isInternalChangeRef = useRef(false);
 
-  const handleEditorChange = (value: string | undefined) => {
+  // Store変更時にMonacoを更新（外部からの変更のみ）
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (lastSyncedSeqRef.current === updateSeq) return;
+    if (isInternalChangeRef.current) {
+      isInternalChangeRef.current = false;
+      lastSyncedSeqRef.current = updateSeq;
+      return;
+    }
+
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    const html = getHtml();
+    const currentValue = model.getValue();
+
+    if (currentValue !== html) {
+      // カーソル位置を保存
+      const position = editorRef.current.getPosition();
+      const scrollTop = editorRef.current.getScrollTop();
+
+      // 全体を置換
+      model.pushEditOperations(
+        [],
+        [{ range: model.getFullModelRange(), text: html }],
+        () => null
+      );
+
+      // カーソル位置を復元
+      if (position) {
+        const lineCount = model.getLineCount();
+        editorRef.current.setPosition({
+          lineNumber: Math.min(position.lineNumber, lineCount),
+          column: position.column,
+        });
+      }
+      editorRef.current.setScrollTop(scrollTop);
+    }
+
+    lastSyncedSeqRef.current = updateSeq;
+  }, [updateSeq, getHtml]);
+
+  const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
 
     // デバウンス処理（300ms）
@@ -23,16 +72,16 @@ export default function EmailCodeEditor() {
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      isInternalChangeRef.current = true;
       setHtml(value);
     }, 300);
-  };
+  }, [setHtml]);
 
-  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
+  const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
     // カーソル位置が変更されたら保存（ドラッグ中は更新しない）
     editor.onDidChangeCursorPosition((e) => {
-      // ドラッグ中はカーソル位置を更新しない（元の位置を保持）
       if (isDraggingRef.current) return;
 
       lastCursorPositionRef.current = {
@@ -49,118 +98,79 @@ export default function EmailCodeEditor() {
         column: initialPosition.column,
       };
     }
-  };
+  }, []);
 
-  const handleDragEnter = (e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current += 1;
     if (dragCounterRef.current === 1) {
-      isDraggingRef.current = true; // ドラッグ開始
+      isDraggingRef.current = true;
       setIsDragOver(true);
     }
-  };
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current -= 1;
     if (dragCounterRef.current === 0) {
-      isDraggingRef.current = false; // ドラッグ終了
+      isDraggingRef.current = false;
       setIsDragOver(false);
     }
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // カウンターをリセット
     dragCounterRef.current = 0;
-    isDraggingRef.current = false; // ドラッグ終了
-
-    // 即座にオーバーレイを消す
+    isDraggingRef.current = false;
     setIsDragOver(false);
 
     const snippetHtml = e.dataTransfer.getData('text/plain');
-    if (!snippetHtml || !editorRef.current) return;
+    if (!snippetHtml) return;
 
-    const editor = editorRef.current;
-
-    // カーソル位置が指定されているか確認
-    if (!lastCursorPositionRef.current) {
-      toast.error('行を指定してからドロップしてください', {
-        description: 'エディタ内でカーソル位置を指定してから、もう一度ドロップしてください。',
-        duration: 4000,
-      });
-      return;
+    // JSONデータも取得してみる（スニペットIDが含まれている場合）
+    let snippetId = '';
+    try {
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (jsonData) {
+        const parsed = JSON.parse(jsonData);
+        snippetId = parsed.id || '';
+      }
+    } catch {
+      // JSONパース失敗は無視
     }
 
-    // ドラッグ前に保存したカーソル位置を使用
-    const position = lastCursorPositionRef.current;
+    // コンポーネントとして追加
+    addComponent(snippetHtml, snippetId);
 
-    if (position) {
-      // 現在のモデルを取得
-      const model = editor.getModel();
-      if (!model) return;
+    toast.success('スニペットを追加しました', {
+      description: 'ビジュアルエディターで並び替えやテキスト編集ができます',
+      duration: 3000,
+    });
 
-      // 保存されたカーソル位置に挿入
-      const range = {
-        startLineNumber: position.lineNumber,
-        startColumn: position.column,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column,
-      };
-
-      // pushEditOperationsを使用
-      model.pushEditOperations(
-        [],
-        [
-          {
-            range,
-            text: '\n' + snippetHtml + '\n',
-          },
-        ],
-        () => null
-      );
-
-      // カーソルを挿入したテキストの後ろに移動
-      const lines = snippetHtml.split('\n');
-      const newPosition = {
-        lineNumber: position.lineNumber + lines.length + 1,
-        column: 1,
-      };
-
-      // 新しいカーソル位置を保存
-      lastCursorPositionRef.current = newPosition;
-
-      // カーソルを設定し、挿入位置を画面中央に表示
-      editor.setPosition(newPosition);
-      editor.revealPositionInCenter(newPosition);
-
-      // 手動でストアを更新（デバウンスをバイパス）
-      const newValue = model.getValue();
-      setHtml(newValue);
-
-      // 最後にフォーカス
-      editor.focus();
-    }
-  };
+    // エディタにフォーカス
+    editorRef.current?.focus();
+  }, [addComponent]);
 
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
-      // Monaco Editorのクリーンアップ
       editorRef.current = null;
     };
   }, []);
+
+  // 現在のHTMLを取得
+  const currentHtml = getHtml();
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -171,11 +181,11 @@ export default function EmailCodeEditor() {
             HTMLコード
           </h2>
           <p className="text-xs text-gray-500 mt-1 ml-3">
-            最後のカーソル位置に挿入（ドロップで自動挿入） / 直接編集可能（300msデバウンス）
+            直接編集可能 / スニペットをドロップで追加
           </p>
         </div>
         <div className="text-xs text-gray-400">
-          {html.length} 文字
+          {currentHtml.length} 文字
         </div>
       </div>
       <div
@@ -185,7 +195,6 @@ export default function EmailCodeEditor() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* ドラッグ中のオーバーレイ - pointer-eventsをnoneにして親要素でイベントを処理 */}
         {isDragOver && (
           <div className="absolute inset-0 z-50 bg-primary-100/50 flex items-center justify-center pointer-events-none">
             <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-400">
@@ -193,12 +202,10 @@ export default function EmailCodeEditor() {
                 <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <p className="font-semibold">最後のカーソル位置に挿入</p>
-                {lastCursorPositionRef.current && (
-                  <p className="text-xs mt-1 text-primary-500">
-                    行 {lastCursorPositionRef.current.lineNumber}
-                  </p>
-                )}
+                <p className="font-semibold">スニペットを追加</p>
+                <p className="text-xs mt-1 text-primary-500">
+                  ドロップして末尾に追加
+                </p>
               </div>
             </div>
           </div>
@@ -206,7 +213,7 @@ export default function EmailCodeEditor() {
         <Editor
           height="100%"
           defaultLanguage="html"
-          value={html}
+          value={currentHtml}
           onChange={handleEditorChange}
           onMount={handleEditorDidMount}
           theme="vs-dark"
@@ -220,7 +227,7 @@ export default function EmailCodeEditor() {
             automaticLayout: true,
             wordWrap: 'on',
             tabSize: 2,
-            dragAndDrop: false, // ネイティブD&D無効化（DisposableStoreエラー対策）
+            dragAndDrop: false,
           }}
         />
       </div>
