@@ -403,7 +403,8 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
 
     addComponent: (snippetHtml, snippetId, index) => {
       const id = crypto.randomUUID();
-      const component = parseComponentFromHtml(snippetHtml, id, snippetId);
+      // addComponentから追加する場合は常にautoAddEditable=trueで呼び出す
+      const component = parseComponentFromHtml(snippetHtml, id, snippetId, true);
 
       set((state) => {
         // 履歴に保存

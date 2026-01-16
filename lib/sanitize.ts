@@ -15,7 +15,8 @@ export function sanitizeHTML(html: string): string {
     ],
     ALLOWED_ATTR: [
       'href', 'src', 'style', 'class', 'id', 'alt', 'title',
-      'width', 'height', 'align', 'border', 'cellpadding', 'cellspacing'
+      'width', 'height', 'align', 'border', 'cellpadding', 'cellspacing',
+      'data-editable', 'data-component-id', 'data-component-type'
     ],
     ALLOW_DATA_ATTR: false,
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'link', 'style'],
