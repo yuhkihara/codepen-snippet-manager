@@ -134,13 +134,11 @@ function addAutoEditableAttributesToHtml(html: string, componentId: string): str
       // 既にdata-editableがある場合はスキップ
       if (el.hasAttribute('data-editable')) return;
 
-      // 子要素にテキストノードがある場合のみ対象
-      const hasDirectText = Array.from(el.childNodes).some(
-        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()
-      );
+      // 子要素（Element）がある場合はスキップ（span等の子タグを壊さないため）
+      if (el.children.length > 0) return;
 
-      // テキストがある場合、または子要素がなくinnerTextがある場合
-      if (hasDirectText || (el.children.length === 0 && el.textContent?.trim())) {
+      // テキストコンテンツがある場合のみ対象（真のリーフ要素）
+      if (el.textContent?.trim()) {
         const fieldName = `field-${componentId.slice(0, 8)}-${editableIndex++}`;
 
         // 元の開始タグを構築（属性を含む）
@@ -211,26 +209,20 @@ function parseComponentFromHtml(
 }
 
 /**
- * コンポーネントをHTMLにシリアライズ
+ * コンポーネントをHTMLにシリアライズ（元のフォーマットを保持）
  */
 function serializeComponent(component: ComponentNode): string {
   let html = component.innerHtml;
 
-  // editableFieldsの値をHTMLに反映
-  if (Object.keys(component.editableFields).length > 0) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    Object.entries(component.editableFields).forEach(([name, field]) => {
-      const el = doc.querySelector(`[data-editable="${name}"]`);
-      if (el) {
-        // 改行を<br>に変換、HTMLエスケープ
-        el.innerHTML = escapeHtml(field.value).replace(/\n/g, '<br>');
-      }
-    });
-
-    html = doc.body.innerHTML;
-  }
+  // editableFieldsの値をHTMLに反映（正規表現で元のフォーマットを保持）
+  Object.entries(component.editableFields).forEach(([name, field]) => {
+    const regex = new RegExp(
+      `(<[^>]+data-editable="${name}"[^>]*>)([\\s\\S]*?)(</)`,
+      'i'
+    );
+    const escapedValue = escapeHtml(field.value).replace(/\n/g, '<br>');
+    html = html.replace(regex, `$1${escapedValue}$3`);
+  });
 
   return `<!-- component:${component.id} -->\n<div data-component-id="${component.id}" data-component-type="${component.type}">\n${html}\n</div>\n<!-- /component:${component.id} -->`;
 }

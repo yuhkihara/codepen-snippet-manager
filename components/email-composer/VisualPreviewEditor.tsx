@@ -103,16 +103,20 @@ const SortableComponent = memo(function SortableComponent({
       }
     `;
 
-    // HTMLを更新（editableFieldsの値を反映）
+    // HTMLを更新（editableFieldsの値を反映、元のフォーマットを保持）
     let html = component.innerHtml;
     Object.entries(component.editableFields).forEach(([name, field]) => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const el = doc.querySelector(`[data-editable="${name}"]`);
-      if (el) {
-        el.innerHTML = field.value.replace(/\n/g, '<br>');
-      }
-      html = doc.body.innerHTML;
+      // data-editable属性を持つタグの内容を置換（正規表現で元のフォーマットを保持）
+      const regex = new RegExp(
+        `(<[^>]+data-editable="${name}"[^>]*>)([\\s\\S]*?)(</)`,
+        'i'
+      );
+      const escapedValue = field.value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      html = html.replace(regex, `$1${escapedValue}$3`);
     });
 
     // XSS防止: HTMLをサニタイズしてから挿入
