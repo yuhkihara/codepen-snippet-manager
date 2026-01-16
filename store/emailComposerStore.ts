@@ -117,35 +117,56 @@ interface EmailComposerStore {
 const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'td', 'th', 'li', 'label'];
 
 /**
- * テキスト要素に自動でdata-editable属性を付与（HTML文字列を直接操作）
+ * テキスト要素に自動でdata-editable属性を付与
  * 既にdata-editableがある要素はスキップ
- * DOMParserのinnerHTMLによるフォーマット変更を避けるため、正規表現で属性を追加
+ * 元のHTMLフォーマットを保持するため、開始タグのみを置換
  */
 function addAutoEditableAttributesToHtml(html: string, componentId: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
   let editableIndex = 0;
-  let result = html;
+  const tagsToProcess: Array<{ tag: string; oldOpenTag: string; newOpenTag: string }> = [];
 
-  // 各対象タグに対して処理
+  // DOMで対象要素を特定
   AUTO_EDITABLE_TAGS.forEach((tag) => {
-    // タグの開始タグを検索（既にdata-editableがないもの）
-    const tagRegex = new RegExp(
-      `<${tag}(\\s[^>]*)?(?<!data-editable[^>]*)>([^<]*)</${tag}>`,
-      'gi'
-    );
-
-    result = result.replace(tagRegex, (match, attrs, content) => {
+    doc.querySelectorAll(tag).forEach((el) => {
       // 既にdata-editableがある場合はスキップ
-      if (attrs && /data-editable/.test(attrs)) {
-        return match;
+      if (el.hasAttribute('data-editable')) return;
+
+      // 子要素にテキストノードがある場合のみ対象
+      const hasDirectText = Array.from(el.childNodes).some(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()
+      );
+
+      // テキストがある場合、または子要素がなくinnerTextがある場合
+      if (hasDirectText || (el.children.length === 0 && el.textContent?.trim())) {
+        const fieldName = `field-${componentId.slice(0, 8)}-${editableIndex++}`;
+
+        // 元の開始タグを構築（属性を含む）
+        const attrs = Array.from(el.attributes)
+          .map(attr => `${attr.name}="${attr.value}"`)
+          .join(' ');
+        const oldOpenTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
+        const newOpenTag = attrs
+          ? `<${tag} ${attrs} data-editable="${fieldName}">`
+          : `<${tag} data-editable="${fieldName}">`;
+
+        tagsToProcess.push({ tag, oldOpenTag, newOpenTag });
       }
-      // テキストコンテンツがない場合はスキップ
-      if (!content || !content.trim()) {
-        return match;
-      }
-      const fieldName = `field-${componentId.slice(0, 8)}-${editableIndex++}`;
-      const newAttrs = attrs ? `${attrs} data-editable="${fieldName}"` : ` data-editable="${fieldName}"`;
-      return `<${tag}${newAttrs}>${content}</${tag}>`;
     });
+  });
+
+  // 元のHTML文字列内で開始タグを置換（フォーマットを保持）
+  let result = html;
+  tagsToProcess.forEach(({ oldOpenTag, newOpenTag }) => {
+    // 属性の順序や空白が異なる可能性があるため、柔軟にマッチ
+    // 最初にマッチしたものだけを置換
+    const escaped = oldOpenTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 属性間の空白を柔軟にマッチ
+    const flexiblePattern = escaped.replace(/\s+/g, '\\s+');
+    const regex = new RegExp(flexiblePattern, 'i');
+    result = result.replace(regex, newOpenTag);
   });
 
   return result;
