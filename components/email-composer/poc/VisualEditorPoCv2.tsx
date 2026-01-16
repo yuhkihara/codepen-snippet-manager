@@ -416,7 +416,9 @@ export function VisualEditorPoCv2() {
   }, []);
 
   // 生成HTML
+  // SSR時はDOMParserが使えないため、クライアントサイドでのみ実行
   const generatedHtml = useMemo(() => {
+    if (typeof window === 'undefined') return '';
     return components
       .map((comp) => {
         let html = comp.html;
