@@ -488,6 +488,7 @@ http://localhost:3000/email-composer/[templateId]
 
 ## 関連ドキュメント
 
+- [visual-editor-rules.md](./visual-editor-rules.md) - **ルール・規約（必読）**
 - [email-composer-spec.md](./email-composer-spec.md) - メールコンポーザー全体仕様
 - [visual-editor-architecture-v2.md](./visual-editor-architecture-v2.md) - アーキテクチャ設計
 - [library-evaluation.md](./library-evaluation.md) - ライブラリ選定
