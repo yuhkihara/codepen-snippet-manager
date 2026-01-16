@@ -6,7 +6,7 @@
 > - [アーキテクチャ図](./architecture-diagram.md) - システム構成とデータフロー
 > - [メールコンポーザー仕様書](./email-composer-spec.md) - HTMLメール作成機能の詳細仕様
 > - [トラブルシューティング](./TROUBLESHOOTING.md) - 問題解決ガイド
-> - [プロジェクトREADME](../../README.md) - プロジェクト全体概要
+> - [プロジェクトREADME](../README.md) - プロジェクト全体概要
 > - [監査レポート](./audits/) - コード監査結果
 
 **最終更新**: 2025-11-20
@@ -616,7 +616,7 @@ module.exports = nextConfig;
 
 `#テンプレート` タグを持つスニペットをベースに、ドラッグ&ドロップでスニペットを組み合わせてHTMLメール全体を作成できる機能。
 
-> **詳細仕様書**: `snippet-manager/docs/email-composer-spec.md` を参照
+> **詳細仕様書**: [email-composer-spec.md](email-composer-spec.md) を参照
 
 ### 主な機能
 
@@ -933,9 +933,9 @@ npm run dev
 | [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2025-11-17 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
-| [../../README.md](../../README.md) | プロジェクト全体概要 | 2025-11-16 |
+| [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
 
 ---
 
-**最終更新**: 2025-11-20
-**更新内容**: Favicon設定追加（app/icon.tsx）
+**Last Updated**: 2026-01-17
+**Update**: Documentation restructured, links fixed

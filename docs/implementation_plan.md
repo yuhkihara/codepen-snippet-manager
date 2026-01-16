@@ -6,7 +6,7 @@
 > - [アーキテクチャ図](./architecture-diagram.md) - システム構成とデータフロー
 > - [メールコンポーザー仕様書](./email-composer-spec.md) - HTMLメール作成機能の詳細仕様
 > - [トラブルシューティング](./TROUBLESHOOTING.md) - 問題解決ガイド
-> - [プロジェクトREADME](../../README.md) - プロジェクト全体概要
+> - [プロジェクトREADME](../README.md) - プロジェクト全体概要
 > - [監査レポート](./audits/) - コード監査結果
 
 **最終更新**: 2025-11-17
@@ -228,7 +228,7 @@
 ### Phase 11: HTMLメールコンポーザー機能 ✅
 **目標**: テンプレートベースのHTMLメール作成機能
 
-> **詳細仕様**: `snippet-manager/docs/email-composer-spec.md` を参照
+> **詳細仕様**: [email-composer-spec.md](email-composer-spec.md) を参照
 
 #### 11.1 基盤準備 ✅
 - [x] `store/emailComposerStore.ts` 実装
@@ -389,9 +389,9 @@
 | [architecture-diagram.md](./architecture-diagram.md) | システム構成とデータフロー | 2025-11-17 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
-| [../../README.md](../../README.md) | プロジェクト全体概要 | 2025-11-16 |
+| [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
 
 ---
 
-**最終更新**: 2025-11-17
-**更新内容**: 最新の改善とバグ修正を追記、関連ドキュメント一覧を追加
+**Last Updated**: 2026-01-17
+**Update**: Documentation restructured, links fixed

@@ -1,28 +1,32 @@
 # CodePen Snippet Manager
 
-CodePen風のHTMLスニペット管理アプリケーション
+CodePen-style HTML snippet management application with real-time preview and email composer functionality.
 
-## Tech Stack
-
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth (GitHub OAuth)
-- **Editor**: Monaco Editor
-- **State Management**: Zustand
-- **Deployment**: Vercel
+**Status**: Production-ready
 
 ## Features
 
-- ✅ GitHub認証ログイン/ログアウト
-- ✅ スニペットのCRUD操作
-- ✅ Monaco Editorによるコード編集
-- ✅ リアルタイムHTMLプレビュー
-- ✅ 自動保存機能
-- ✅ カテゴリ・タグ管理
-- ✅ グリッド/カテゴリ別表示切り替え
-- ✅ HTMLメールコンポーザー
+- GitHub OAuth authentication
+- CRUD operations for HTML snippets
+- Monaco Editor with syntax highlighting
+- Real-time HTML preview (sandboxed iframe)
+- Auto-save with optimistic locking (3-second debounce)
+- Category and tag management
+- Grid/category view switching
+- HTML email composer with drag & drop
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 15 (App Router), React 19, TypeScript |
+| Styling | Tailwind CSS |
+| Database | Supabase (PostgreSQL + RLS) |
+| Auth | Supabase Auth (GitHub OAuth) |
+| Editor | Monaco Editor |
+| State | Zustand |
+| Validation | Zod |
+| Security | DOMPurify |
 
 ## Quick Start
 
@@ -38,11 +42,11 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000)
 
 ## Environment Variables
 
-Create `.env.local` file:
+Create `.env.local`:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -52,10 +56,67 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Documentation
 
-- [DEVELOPMENT.md](DEVELOPMENT.md) - Development guide
-- [docs/codepen_html.md](docs/codepen_html.md) - Implementation spec (SSOT)
-- [docs/email-composer-spec.md](docs/email-composer-spec.md) - Email composer spec
-- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) - Deployment guide
+All documentation is organized in the `/docs` directory:
+
+### Core Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Development guide and setup |
+| [codepen_html.md](docs/codepen_html.md) | Implementation spec (SSOT) |
+| [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | Feature checklist and status |
+| [architecture-diagram.md](docs/architecture-diagram.md) | System architecture (Mermaid) |
+
+### Feature Documentation
+
+| Document | Description |
+|----------|-------------|
+| [email-composer-spec.md](docs/email-composer-spec.md) | Email composer feature spec |
+| [implementation_plan.md](docs/implementation_plan.md) | Phase-based implementation plan |
+
+### Operations
+
+| Document | Description |
+|----------|-------------|
+| [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) | Supabase + Vercel deployment |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [audits/](docs/audits/) | Code audit reports |
+
+### AI Assistant
+
+| Document | Description |
+|----------|-------------|
+| [CLAUDE.md](CLAUDE.md) | Instructions for AI assistants |
+
+## Project Structure
+
+```
+codepen-snippet-manager/
+├── app/                    # Next.js App Router pages
+│   ├── (dashboard)/        # Protected routes
+│   ├── (public)/           # Public routes
+│   └── auth/               # Auth callback
+├── components/             # React components
+│   ├── editor/             # Monaco editor components
+│   ├── email-composer/     # Email composer components
+│   └── snippets/           # Snippet management
+├── docs/                   # Documentation (all docs here)
+│   └── audits/             # Audit reports
+├── hooks/                  # Custom React hooks
+├── lib/                    # Utilities and Supabase clients
+├── store/                  # Zustand stores
+├── types/                  # TypeScript types
+├── CLAUDE.md               # AI assistant instructions
+└── README.md               # This file
+```
+
+## Security
+
+- XSS Prevention via DOMPurify (`lib/sanitize.ts`)
+- iframe sandbox with `allow-scripts` only
+- Content Security Policy (CSP)
+- Row Level Security (RLS) at database level
+- GitHub OAuth authentication
 
 ## License
 

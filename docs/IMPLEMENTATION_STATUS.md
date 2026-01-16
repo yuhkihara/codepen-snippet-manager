@@ -1,9 +1,10 @@
 # 実装状況チェックリスト
 
 > **関連ドキュメント:**
-> - 実装仕様書: [`codepen_html.md`](codepen_html.md)
-> - 実装計画: [`implementation_plan.md`](implementation_plan.md)
-> - 開発ドキュメント: [`snippet-manager/DEVELOPMENT.md`](snippet-manager/DEVELOPMENT.md)
+> - 実装仕様書 (SSOT): [codepen_html.md](codepen_html.md)
+> - 実装計画: [implementation_plan.md](implementation_plan.md)
+> - 開発ドキュメント: [DEVELOPMENT.md](DEVELOPMENT.md)
+> - AI向け指示: [CLAUDE.md](../CLAUDE.md)
 
 ## 技術スタック
 - Next.js 15.0.0
@@ -65,7 +66,7 @@
 - ✅ app/icon.tsx (Favicon設定 - 👑絵文字)
 
 ## Phase 9: HTMLメールコンポーザー機能 ✅ (NEW)
-> **仕様書:** [`snippet-manager/docs/email-composer-spec.md`](snippet-manager/docs/email-composer-spec.md)
+> **仕様書:** [`email-composer-spec.md`](email-composer-spec.md)
 
 ### フェーズ1: 基盤準備 ✅
 - ✅ store/emailComposerStore.ts (Zustandストア)
@@ -131,10 +132,10 @@
 - ⚠️ エッジケーステスト
 
 ### 監査プロセス ✅ (2025-11-16)
-- ✅ 監査レポート取得 (`snippet-manager/docs/audits/audit_review_20251116.md`)
+- ✅ 監査レポート取得 (`audits/audit_review_20251116.md`)
 - ✅ CLAUDE.md を mainブランチの詳細版に更新（監査ルール追加）
 - ✅ email-composer-spec.md を mainブランチの包括的な仕様書に同期
-- ✅ 監査フィードバックレポート作成 (`snippet-manager/docs/audits/feedback_20251116.md`)
+- ✅ 監査フィードバックレポート作成 (`audits/feedback_20251116.md`)
 - ✅ 🔴最高優先度のセキュリティ仕様を文書化
   - DOMPurify必須化（仕様書に明記）
   - テンプレート認可チェック（仕様書に実装例記載）
@@ -166,7 +167,7 @@
   - DisposableStore エラー解決
 
 ### 監査完了 ✅ (2025-11-16)
-- ✅ 最新監査レポート作成 (`snippet-manager/docs/audits/audit_review_20251116_latest.md`)
+- ✅ 最新監査レポート作成 (`audits/audit_review_20251116_latest.md`)
 - ✅ **リリース判定: リリース可能**
   - すべての 🔴 最高優先度問題を解決
   - すべての 🟠 高優先度問題を解決
@@ -289,7 +290,7 @@
   - Read/Grep/Globツールでコードベース全体を徹底的に監査
   - components/, lib/, hooks/, store/, app/ すべてをレビュー
   - 設定ファイル（next.config.js, middleware.ts等）も監査
-- ✅ **監査レポート作成** (`snippet-manager/docs/audits/audit_review_20251117.md`)
+- ✅ **監査レポート作成** (`audits/audit_review_20251117.md`)
   - セキュリティ、パフォーマンス、コード品質、ベストプラクティスを評価
   - 発見された問題の優先度分類（🔴 最高、🟠 高、🟡 中）
 
@@ -356,7 +357,7 @@
 ## Codex監査対応とドロップ機能完全修正 ✅ (2025-11-17)
 
 ### Hydration Mismatch 根本解決 ✅
-- ✅ **Codex監査レポート取得**(`snippet-manager/docs/audits/codex-hydration-audit-20251117.md`)
+- ✅ **Codex監査レポート取得**(`audits/codex-hydration-audit-20251117.md`)
 - ✅ **根本原因の特定**: `suppressHydrationWarning`で症状を隠していただけ
 - ✅ **タイムゾーン固定の日付フォーマットユーティリティ作成**
   - **ファイル**: `lib/formatDate.ts`
@@ -429,10 +430,10 @@
 
 ### 監査レポート ✅
 - ✅ **Hydration監査レポート**
-  - `snippet-manager/docs/audits/hydration_audit_20251117.md`
+  - `audits/hydration_audit_20251117.md`
   - 全パターンを網羅的に監査し、問題なしを確認
 - ✅ **Codex監査レポート**
-  - `snippet-manager/docs/audits/codex-hydration-audit-20251117.md`
+  - `audits/codex-hydration-audit-20251117.md`
   - 根本的な問題指摘と解決策の提示
 
 ### リリース判定 ✅
@@ -454,9 +455,9 @@
 | [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2025-11-17 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
-| [../../README.md](../../README.md) | プロジェクト全体概要 | 2025-11-16 |
+| [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
 
 ---
 
-**最終更新**: 2025-11-20
-**更新内容**: Favicon設定追加（app/icon.tsx - 👑絵文字）
+**Last Updated**: 2026-01-17
+**Update**: Documentation restructured, links fixed

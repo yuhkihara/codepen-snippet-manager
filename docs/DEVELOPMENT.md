@@ -1,10 +1,11 @@
 # Snippet Manager - 開発ドキュメント
 
 > **関連ドキュメント:**
-> - プロジェクト概要: [`../README.md`](../README.md)
-> - 実装仕様書 (SSOT): [`../codepen_html.md`](../codepen_html.md)
-> - 実装ステータス: [`../IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md)
-> - アーキテクチャ図: [`docs/architecture-diagram.md`](docs/architecture-diagram.md)
+> - プロジェクト概要: [README.md](../README.md)
+> - 実装仕様書 (SSOT): [codepen_html.md](codepen_html.md)
+> - 実装ステータス: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
+> - アーキテクチャ図: [architecture-diagram.md](architecture-diagram.md)
+> - AI向け指示: [CLAUDE.md](../CLAUDE.md)
 
 ## プロジェクト概要
 

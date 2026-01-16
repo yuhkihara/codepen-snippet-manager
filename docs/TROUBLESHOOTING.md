@@ -17,8 +17,8 @@
    - 根本的に差分が発生しない実装に変更
 
 3. **監査レポート**
-   - `snippet-manager/docs/audits/hydration_audit_20251117.md`
-   - `snippet-manager/docs/audits/codex-hydration-audit-20251117.md`
+   - [audits/hydration_audit_20251117.md](audits/hydration_audit_20251117.md)
+   - [audits/codex-hydration-audit-20251117.md](audits/codex-hydration-audit-20251117.md)
 
 ### キャッシュが原因の場合
 古いビルドがキャッシュされている可能性があります。
@@ -31,7 +31,7 @@
 # 開発サーバーを停止（Ctrl+C）
 
 # .nextフォルダを削除（ビルドキャッシュのクリア）
-cd snippet-manager
+# Run from project root
 rm -rf .next
 
 # node_modulesも削除（念のため）
@@ -66,7 +66,7 @@ git log --oneline -5
 git pull origin claude/fix-react-error-418-015QkocdaNLrTBKBFaJjTZnJ
 
 # 再度ビルドキャッシュをクリア
-cd snippet-manager
+# Run from project root
 rm -rf .next node_modules package-lock.json
 npm install
 npm run dev
@@ -85,13 +85,13 @@ Vercelにデプロイしている場合:
 
 ```bash
 # EmailPreviewPane.tsxのisMounted確認
-grep -A5 "isMounted" snippet-manager/components/email-composer/EmailPreviewPane.tsx
+grep -A5 "isMounted" components/email-composer/EmailPreviewPane.tsx
 
 # EmailCodeEditor.tsxのpushEditOperations確認
-grep -A10 "pushEditOperations" snippet-manager/components/email-composer/EmailCodeEditor.tsx
+grep -A10 "pushEditOperations" components/email-composer/EmailCodeEditor.tsx
 
 # DOMPurifyのインストール確認
-grep "isomorphic-dompurify" snippet-manager/package.json
+grep "isomorphic-dompurify" package.json
 ```
 
 期待される出力:
@@ -123,7 +123,7 @@ grep "isomorphic-dompurify" snippet-manager/package.json
 
 ```bash
 # すべてをクリーンに
-cd snippet-manager
+# Run from project root
 rm -rf .next node_modules package-lock.json
 git clean -fdx
 npm install
@@ -196,4 +196,4 @@ npx tsc --noEmit
 
 ---
 
-最終更新: 2025-11-17
+**Last Updated**: 2026-01-17

@@ -5,7 +5,7 @@
 > - [トラブルシューティング](./TROUBLESHOOTING.md) - 問題解決ガイド
 > - [アーキテクチャ図](./architecture-diagram.md) - システム構成とデータフロー
 > - [基本仕様書](./codepen_html.md) - スニペット管理機能の仕様
-> - [プロジェクトREADME](../../README.md) - プロジェクト全体概要
+> - [プロジェクトREADME](../README.md) - プロジェクト全体概要
 
 **最終更新**: 2025-11-17
 **実装状況**: ✅ 完了（本番環境デプロイ可能）
@@ -468,13 +468,13 @@ snippet-manager/
 
 | ドキュメント | 説明 |
 |------------|------|
-| [README.md](../../README.md) | プロジェクト全体概要、技術スタック |
+| [README.md](../README.md) | プロジェクト全体概要、技術スタック |
 | [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) | 実装進捗、リリース判定 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 問題解決ガイド |
 | [architecture-diagram.md](./architecture-diagram.md) | システム構成図 |
 | [codepen_html.md](./codepen_html.md) | 基本スニペット管理機能 |
-| [CLAUDE.md](../../CLAUDE.md) | 実装ルール、ドキュメント管理 |
+| [CLAUDE.md](../CLAUDE.md) | 実装ルール、ドキュメント管理 |
 
 ---
 
-最終更新: 2025-11-17
+**Last Updated**: 2026-01-17
