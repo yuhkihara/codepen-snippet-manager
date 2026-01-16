@@ -158,6 +158,26 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 | `store/emailComposerStore.ts` | Email composer state |
 | `middleware.ts` | Auth protection |
 
+## Available Skills
+
+Skills are located in `.claude/skills/`:
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| [update-docs](.claude/skills/update-docs.skill.md) | `/update-docs` | Update all documentation after changes |
+| [design-review](.claude/skills/design-review.skill.md) | `/design-review` | Review UI for "AI Slop" aesthetics |
+| [check-spec](.claude/skills/check-spec.skill.md) | `/check-spec` | Verify implementation against spec |
+| [audit](.claude/skills/audit.skill.md) | `/audit` | Comprehensive code audit |
+
+### Usage
+
+```bash
+/update-docs          # Update docs after implementation
+/design-review        # Review UI design
+/check-spec           # Check against codepen_html.md
+/audit                # Run code audit
+```
+
 ## Related Documentation
 
 - [README.md](README.md) - Project overview
