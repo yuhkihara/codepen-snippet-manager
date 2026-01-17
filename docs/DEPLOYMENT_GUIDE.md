@@ -151,7 +151,48 @@ CREATE POLICY "revisions_delete_own" ON revisions FOR DELETE USING (EXISTS (SELE
 4. GitHub OAuth Appの **Client ID** と **Client Secret** を入力
 5. **Save** をクリック
 
-### 1.4 Supabase認証情報の取得
+### 1.4 Google OAuth設定
+
+#### Google Cloud Console設定
+
+1. [Google Cloud Console](https://console.cloud.google.com/) にアクセス
+2. プロジェクトを選択（または新規作成）
+3. **APIs & Services** > **OAuth consent screen** に移動
+4. User Typeを **External** に設定し、**CREATE** をクリック
+5. 以下の必須情報を入力:
+   - **App name**: `CodePen Snippets` (任意)
+   - **User support email**: あなたのメールアドレス
+   - **Developer contact information**: あなたのメールアドレス
+6. **SAVE AND CONTINUE** をクリック
+7. Scopesの設定で以下を追加:
+   - `email`
+   - `profile`
+   - `openid`
+8. **SAVE AND CONTINUE** で進み、**BACK TO DASHBOARD** をクリック
+
+#### OAuth 2.0クライアント作成
+
+1. **APIs & Services** > **Credentials** に移動
+2. **+ CREATE CREDENTIALS** > **OAuth client ID** をクリック
+3. 以下を設定:
+   - **Application type**: `Web application`
+   - **Name**: `CodePen Snippets Web Client` (任意)
+   - **Authorized JavaScript origins**:
+     - `https://your-project.supabase.co`
+   - **Authorized redirect URIs**:
+     - `https://your-project.supabase.co/auth/v1/callback`
+4. **CREATE** をクリック
+5. **Client ID** と **Client Secret** を保存
+
+#### SupabaseでGoogle認証を有効化
+
+1. Supabase Dashboard > **Authentication** > **Providers** に移動
+2. **Google** を選択
+3. **Enable Sign in with Google** をオン
+4. Google OAuth Appの **Client ID** と **Client Secret** を入力
+5. **Save** をクリック
+
+### 1.5 Supabase認証情報の取得
 
 1. Supabase Dashboard > **Settings** > **API** に移動
 2. 以下をメモ:
@@ -201,21 +242,38 @@ Vercelデプロイ後、GitHub OAuth Appの設定を更新:
 
 ## ✅ Step 3: 動作確認
 
+### 3.1 GitHub認証の確認
+
 1. Vercelのデプロイ完了URLにアクセス
-2. ログインページで **Sign in with GitHub** をクリック
+2. ログインページで **GitHubでログイン** をクリック
 3. GitHub認証を完了
 4. スニペット一覧ページが表示されることを確認
 5. 新規スニペット作成をテスト
+
+### 3.2 Google認証の確認
+
+1. 一度ログアウト
+2. ログインページで **Googleでログイン** をクリック
+3. Google認証を完了
+4. スニペット一覧ページが表示されることを確認
+5. プロフィールにGoogleアカウント情報（名前・アバター）が反映されているか確認
 
 ---
 
 ## 🔧 トラブルシューティング
 
-### 認証エラー
+### GitHub認証エラー
 
 - GitHub OAuth CallbackURLが正しいか確認
 - Supabase Redirect URLsに本番URLが追加されているか確認
 - 環境変数が正しく設定されているか確認
+
+### Google認証エラー
+
+- Google Cloud ConsoleでOAuth同意画面が正しく設定されているか確認
+- OAuthクライアントの **Authorized redirect URIs** に `https://your-project.supabase.co/auth/v1/callback` が含まれているか確認
+- Supabase DashboardでGoogle OAuthが有効化され、Client IDとClient Secretが正しく入力されているか確認
+- アプリが「テストモード」の場合、テストユーザーとして登録されたGoogleアカウントでのみログイン可能です
 
 ### データベースエラー
 

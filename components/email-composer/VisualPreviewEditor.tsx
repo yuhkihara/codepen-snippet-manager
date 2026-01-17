@@ -8,6 +8,7 @@
  * - Inline text editing with @tiptap
  * - Shadow DOM for style isolation
  * - Real-time sync with Monaco Editor via Zustand store
+ * - Context menu for text styling (bold, colored text)
  */
 
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
@@ -32,6 +33,122 @@ import { CSS } from '@dnd-kit/utilities';
 import { useEmailComposerStore } from '@/store/emailComposerStore';
 import { sanitizeHTML } from '@/lib/sanitize';
 import { Trash2, GripVertical, Undo, Redo } from 'lucide-react';
+
+// ===== Context Menu Types =====
+
+/**
+ * Context menu item definition.
+ * Designed for future extensibility (e.g., user-configurable items from settings).
+ */
+interface ContextMenuItem {
+  /** Unique identifier */
+  id: string;
+  /** Display label */
+  label: string;
+  /** HTML wrapper for the selected text. Use {text} as placeholder. */
+  htmlTemplate: string;
+  /** Optional icon component */
+  icon?: React.ReactNode;
+}
+
+/**
+ * Default context menu items.
+ * These can be extended via settings in the future.
+ */
+const DEFAULT_CONTEXT_MENU_ITEMS: ContextMenuItem[] = [
+  {
+    id: 'bold',
+    label: '太字',
+    htmlTemplate: '<strong>{text}</strong>',
+  },
+  {
+    id: 'red',
+    label: '赤字',
+    htmlTemplate: '<span style="color:#d70035;">{text}</span>',
+  },
+  {
+    id: 'blue',
+    label: '青字',
+    htmlTemplate: '<span style="color:#0086ab;">{text}</span>',
+  },
+];
+
+// ===== Context Menu Component =====
+
+interface ContextMenuProps {
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  onSelect: (item: ContextMenuItem) => void;
+  onClose: () => void;
+}
+
+/**
+ * Custom context menu component displayed on right-click.
+ */
+const ContextMenu = memo(function ContextMenu({
+  x,
+  y,
+  items,
+  onSelect,
+  onClose,
+}: ContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // メニュー外クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // 少し遅延させてから登録（右クリックイベント自体で閉じないように）
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  // 画面端でのはみ出し防止
+  const adjustedStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: x,
+    top: y,
+    zIndex: 9999,
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      style={adjustedStyle}
+      className="bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]"
+    >
+      {items.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => onSelect(item)}
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition-colors"
+        >
+          {item.icon && <span className="w-4 h-4">{item.icon}</span>}
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+});
 
 // ===== Sortable Component =====
 
@@ -70,6 +187,14 @@ const SortableComponent = memo(function SortableComponent({
   const isUpdatingRef = useRef(false);
   const lastHtmlRef = useRef<string>('');
   const [isEditing, setIsEditing] = useState(false);
+
+  // コンテキストメニュー状態
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    selection: Selection;
+    range: Range;
+  } | null>(null);
 
   // Shadow DOMの初期化（一度だけ実行）
   useEffect(() => {
@@ -282,51 +407,173 @@ const SortableComponent = memo(function SortableComponent({
     }
   }, [componentId, deleteComponent]);
 
+  // 右クリックでコンテキストメニュー表示（編集モード時のみ）
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // 編集モードでない場合はデフォルト動作
+    if (!isEditing) return;
+
+    // Shadow DOM内の選択を取得
+    const selection = document.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      // 選択テキストがない場合はデフォルト動作
+      return;
+    }
+
+    // 選択がShadow DOM内かどうか確認
+    const range = selection.getRangeAt(0);
+    const shadowRoot = shadowRootRef.current;
+    if (!shadowRoot) return;
+
+    // 選択されたテキストがShadow DOM内にあるか確認
+    const startContainer = range.startContainer;
+    let isInShadow = false;
+    let node: Node | null = startContainer;
+    while (node) {
+      if (node === shadowRoot) {
+        isInShadow = true;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (!isInShadow) return;
+
+    // デフォルトのコンテキストメニューを抑制
+    e.preventDefault();
+    e.stopPropagation();
+
+    // コンテキストメニューを表示
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      selection,
+      range: range.cloneRange(),
+    });
+  }, [isEditing]);
+
+  // コンテキストメニュー項目選択時の処理
+  const handleContextMenuSelect = useCallback((item: ContextMenuItem) => {
+    if (!contextMenu || !shadowRootRef.current) {
+      setContextMenu(null);
+      return;
+    }
+
+    const { range } = contextMenu;
+    const selectedText = range.toString();
+
+    if (!selectedText) {
+      setContextMenu(null);
+      return;
+    }
+
+    // 選択テキストをHTMLテンプレートで囲む
+    const wrappedHtml = item.htmlTemplate.replace('{text}', selectedText);
+
+    // 選択範囲を削除して新しいHTMLを挿入
+    range.deleteContents();
+
+    // HTMLを挿入（DocumentFragmentを使用）
+    const temp = document.createElement('div');
+    temp.innerHTML = wrappedHtml;
+    const fragment = document.createDocumentFragment();
+    while (temp.firstChild) {
+      fragment.appendChild(temp.firstChild);
+    }
+    range.insertNode(fragment);
+
+    // 選択をクリア
+    const selection = document.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+    }
+
+    // コンテキストメニューを閉じる
+    setContextMenu(null);
+
+    // Storeに同期（編集完了扱い）
+    const contentDiv = shadowRootRef.current.querySelector('.component-content');
+    if (contentDiv) {
+      isUpdatingRef.current = true;
+      const clone = contentDiv.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('[contenteditable]').forEach((el) => {
+        el.removeAttribute('contenteditable');
+      });
+      clone.classList.remove('editing');
+      const newHtml = clone.innerHTML;
+      if (newHtml !== lastHtmlRef.current) {
+        lastHtmlRef.current = newHtml;
+        updateComponentHtml(componentId, newHtml);
+      }
+      requestAnimationFrame(() => {
+        isUpdatingRef.current = false;
+      });
+    }
+  }, [contextMenu, componentId, updateComponentHtml]);
+
+  // コンテキストメニューを閉じる
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   if (!component) return null;
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`relative group rounded-lg transition-all ${
-        isSelected
-          ? isEditing
-            ? 'ring-2 ring-green-500 ring-offset-2'
-            : 'ring-2 ring-blue-500 ring-offset-2'
-          : 'hover:ring-1 hover:ring-gray-300'
-      }`}
-      onClick={handleSelect}
-      onDoubleClick={handleDoubleClick}
-    >
-      {/* ツールバー */}
+    <>
       <div
-        className={`absolute -top-3 right-2 flex gap-1 transition-opacity ${
-          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        ref={setNodeRef}
+        style={style}
+        className={`relative group rounded-lg transition-all ${
+          isSelected
+            ? isEditing
+              ? 'ring-2 ring-green-500 ring-offset-2'
+              : 'ring-2 ring-blue-500 ring-offset-2'
+            : 'hover:ring-1 hover:ring-gray-300'
         }`}
+        onClick={handleSelect}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
       >
-        {/* ドラッグハンドル */}
+        {/* ツールバー */}
         <div
-          {...attributes}
-          {...listeners}
-          className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing flex items-center justify-center shadow-sm border border-gray-200"
-          title="ドラッグで並び替え"
+          className={`absolute -top-3 right-2 flex gap-1 transition-opacity ${
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
         >
-          <GripVertical className="w-4 h-4 text-gray-500" />
+          {/* ドラッグハンドル */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing flex items-center justify-center shadow-sm border border-gray-200"
+            title="ドラッグで並び替え"
+          >
+            <GripVertical className="w-4 h-4 text-gray-500" />
+          </div>
+
+          {/* 削除ボタン */}
+          <button
+            onClick={handleDelete}
+            className="w-7 h-7 bg-red-50 hover:bg-red-100 rounded flex items-center justify-center shadow-sm border border-red-200"
+            title="コンポーネントを削除"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </button>
         </div>
 
-        {/* 削除ボタン */}
-        <button
-          onClick={handleDelete}
-          className="w-7 h-7 bg-red-50 hover:bg-red-100 rounded flex items-center justify-center shadow-sm border border-red-200"
-          title="コンポーネントを削除"
-        >
-          <Trash2 className="w-4 h-4 text-red-500" />
-        </button>
+        {/* Shadow DOMコンテナ */}
+        <div ref={containerRef} className="min-h-[20px]" />
       </div>
 
-      {/* Shadow DOMコンテナ */}
-      <div ref={containerRef} className="min-h-[20px]" />
-    </div>
+      {/* コンテキストメニュー（編集モード時のみ） */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={DEFAULT_CONTEXT_MENU_ITEMS}
+          onSelect={handleContextMenuSelect}
+          onClose={handleContextMenuClose}
+        />
+      )}
+    </>
   );
 });
 
