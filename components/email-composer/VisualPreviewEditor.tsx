@@ -160,7 +160,6 @@ const SortableComponent = memo(function SortableComponent({
       });
     };
 
-    let inputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const cleanupFunctions: (() => void)[] = [];
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -169,7 +168,7 @@ const SortableComponent = memo(function SortableComponent({
         e.preventDefault();
         const entity = e.key === '<' ? '&lt;' : '&gt;';
         document.execCommand('insertHTML', false, entity);
-        setTimeout(syncToStore, 10);
+        // 入力中はStoreに同期しない（編集完了時にまとめて同期）
         return;
       }
 
@@ -182,24 +181,21 @@ const SortableComponent = memo(function SortableComponent({
             selection.collapseToEnd();
           }
           document.execCommand('insertHTML', false, '<br>');
-          setTimeout(syncToStore, 10);
+          // 入力中はStoreに同期しない
         }
       }
       if (e.key === 'Escape') {
+        // Escape時は編集完了としてStoreに同期
+        syncToStore();
         setIsEditing(false);
       }
     };
 
-    const handleInput = () => {
-      if (inputDebounceTimer) clearTimeout(inputDebounceTimer);
-      inputDebounceTimer = setTimeout(syncToStore, 100);
-    };
+    // 入力中はStoreに同期しない（パフォーマンスと入力干渉を防ぐ）
+    // 編集完了時（blur/Escape/他のコンポーネントクリック）にのみ同期
 
     const handleFocusOut = () => {
-      if (inputDebounceTimer) {
-        clearTimeout(inputDebounceTimer);
-        inputDebounceTimer = null;
-      }
+      // フォーカスが外れたら編集完了としてStoreに同期
       syncToStore();
     };
 
@@ -222,12 +218,11 @@ const SortableComponent = memo(function SortableComponent({
             htmlEl.contentEditable = 'true';
 
             // 各要素に直接イベントリスナーを付ける
-            htmlEl.addEventListener('input', handleInput);
+            // 入力中は同期しない。blur/keydown(Escape)時のみ同期
             htmlEl.addEventListener('blur', handleFocusOut);
             htmlEl.addEventListener('keydown', handleKeyDown);
 
             cleanupFunctions.push(() => {
-              htmlEl.removeEventListener('input', handleInput);
               htmlEl.removeEventListener('blur', handleFocusOut);
               htmlEl.removeEventListener('keydown', handleKeyDown);
             });
@@ -238,18 +233,37 @@ const SortableComponent = memo(function SortableComponent({
 
     return () => {
       cleanupFunctions.forEach(fn => fn());
-      if (inputDebounceTimer) clearTimeout(inputDebounceTimer);
     };
     // component?.innerHtmlのみに依存（componentオブジェクト全体ではなく）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [component?.innerHtml, isEditing, componentId, updateComponentHtml]);
 
-  // 選択解除時に編集モードも解除
+  // 選択解除時に編集モードも解除（編集内容を同期してから）
   useEffect(() => {
-    if (!isSelected) {
+    if (!isSelected && isEditing) {
+      // 選択解除前に編集内容をStoreに同期
+      if (shadowRootRef.current) {
+        const contentDiv = shadowRootRef.current.querySelector('.component-content');
+        if (contentDiv) {
+          isUpdatingRef.current = true;
+          const clone = contentDiv.cloneNode(true) as HTMLElement;
+          clone.querySelectorAll('[contenteditable]').forEach((el) => {
+            el.removeAttribute('contenteditable');
+          });
+          clone.classList.remove('editing');
+          const newHtml = clone.innerHTML;
+          if (newHtml !== lastHtmlRef.current) {
+            lastHtmlRef.current = newHtml;
+            updateComponentHtml(componentId, newHtml);
+          }
+          requestAnimationFrame(() => {
+            isUpdatingRef.current = false;
+          });
+        }
+      }
       setIsEditing(false);
     }
-  }, [isSelected]);
+  }, [isSelected, isEditing, componentId, updateComponentHtml]);
 
   const handleSelect = useCallback(() => {
     setSelectedComponentId(componentId);
