@@ -195,6 +195,9 @@ const SortableComponent = memo(function SortableComponent({
     range: Range;
   } | null>(null);
 
+  // 選択範囲を保持（Shadow DOM内の選択を追跡するため）
+  const currentSelectionRef = useRef<Range | null>(null);
+
   // Shadow DOMの初期化（一度だけ実行）
   useEffect(() => {
     if (!containerRef.current) return;
@@ -341,63 +344,58 @@ const SortableComponent = memo(function SortableComponent({
             const htmlEl = el as HTMLElement;
             htmlEl.contentEditable = 'true';
 
+            // マウスアップ時に選択範囲を保存（Shadow DOM内の選択を追跡）
+            const handleMouseUp = () => {
+              const selection = document.getSelection();
+              if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+                currentSelectionRef.current = selection.getRangeAt(0).cloneRange();
+              }
+            };
+
+            // 右クリック時にコンテキストメニューを表示
+            const handleContextMenu = (e: Event) => {
+              const mouseEvent = e as MouseEvent;
+              const storedRange = currentSelectionRef.current;
+
+              // 保存された選択範囲を確認
+              if (!storedRange || storedRange.collapsed) {
+                // 選択がない場合はデフォルトの右クリックメニュー
+                return;
+              }
+
+              const selectedText = storedRange.toString();
+              if (!selectedText || selectedText.trim() === '') {
+                return;
+              }
+
+              // デフォルトのコンテキストメニューを抑制
+              mouseEvent.preventDefault();
+              mouseEvent.stopPropagation();
+
+              // カスタムコンテキストメニューを表示
+              setContextMenu({
+                x: mouseEvent.clientX,
+                y: mouseEvent.clientY,
+                range: storedRange.cloneRange(),
+              });
+            };
+
             // 各要素に直接イベントリスナーを付ける
             // 入力中は同期しない。blur/keydown(Escape)時のみ同期
             htmlEl.addEventListener('blur', handleFocusOut);
             htmlEl.addEventListener('keydown', handleKeyDown);
+            htmlEl.addEventListener('mouseup', handleMouseUp);
+            htmlEl.addEventListener('contextmenu', handleContextMenu);
 
             cleanupFunctions.push(() => {
               htmlEl.removeEventListener('blur', handleFocusOut);
               htmlEl.removeEventListener('keydown', handleKeyDown);
+              htmlEl.removeEventListener('mouseup', handleMouseUp);
+              htmlEl.removeEventListener('contextmenu', handleContextMenu);
             });
           }
         });
       });
-
-      // Shadow DOM内でのcontextmenuイベントをキャプチャ
-      const handleShadowContextMenu = (e: Event) => {
-        const mouseEvent = e as MouseEvent;
-
-        // Shadow DOM内の選択を取得
-        // getSelection()はShadow DOM内では特殊な処理が必要
-        // ShadowRoot.getSelection()は実験的APIのため型定義を拡張
-        const shadowWithSelection = shadow as ShadowRoot & { getSelection?: () => Selection | null };
-        const selection = shadowWithSelection.getSelection
-          ? shadowWithSelection.getSelection()
-          : document.getSelection();
-
-        if (!selection || selection.isCollapsed || !selection.rangeCount) {
-          // 選択テキストがない場合はデフォルト動作
-          return;
-        }
-
-        const range = selection.getRangeAt(0);
-        const selectedText = range.toString();
-
-        if (!selectedText || selectedText.trim() === '') {
-          // 選択テキストが空の場合はデフォルト動作
-          return;
-        }
-
-        // デフォルトのコンテキストメニューを抑制
-        mouseEvent.preventDefault();
-        mouseEvent.stopPropagation();
-
-        // コンテキストメニューを表示
-        setContextMenu({
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-          range: range.cloneRange(),
-        });
-      };
-
-      const contentDiv = shadow.querySelector('.component-content');
-      if (contentDiv) {
-        contentDiv.addEventListener('contextmenu', handleShadowContextMenu);
-        cleanupFunctions.push(() => {
-          contentDiv.removeEventListener('contextmenu', handleShadowContextMenu);
-        });
-      }
     }
 
     return () => {
