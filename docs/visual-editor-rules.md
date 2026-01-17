@@ -74,12 +74,13 @@
 | カテゴリ | タグ |
 |----------|------|
 | 見出し | `h1`, `h2`, `h3`, `h4`, `h5`, `h6` |
-| ブロック | `p`, `div` |
+| ブロック | `p` |
 | インライン | `span`, `label` |
 | テーブル | `td`, `th` |
 | リスト | `li` |
 
 > **Note**: 子要素を持つ親タグには付与されません。テキストを直接含むリーフ要素のみが対象です。
+> **Note**: `div`は汎用コンテナとして使われることが多く、テキスト増殖バグの原因となるため対象外です。
 
 ### 2.3 自動付与機能
 
@@ -181,8 +182,8 @@
 const COMPONENT_MARKER = '<!--ここにコンポーネントを入れる-->';
 const COMPONENT_MARKER_END = '<!--/ここにコンポーネントを入れる-->';
 
-// 自動editable対象タグ（子要素のないリーフ要素のみ）
-const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'td', 'th', 'li', 'label'];
+// 自動editable対象タグ（子要素のないリーフ要素のみ、divは除外）
+const AUTO_EDITABLE_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
 
 // 履歴
 const MAX_HISTORY_SIZE = 50;

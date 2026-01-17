@@ -301,4 +301,6 @@ npm install -D @types/lodash-es
 | リッチテキスト | @tiptap/react | 日本語IME対応、ProseMirrorベース |
 | 状態管理 | Zustand + immer | 既存継続、イミュータブル更新強化 |
 
-**次のステップ**: ライブラリのインストールと、PoC拡張（dnd-kit/TipTap統合）
+**ステータス**: ✅ 実装完了（2026-01-17）
+
+選定したライブラリはすべてインストール・統合済み。動作確認完了。

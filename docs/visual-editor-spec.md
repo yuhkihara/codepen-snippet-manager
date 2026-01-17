@@ -107,6 +107,11 @@ interface EmailComposerStore {
   components: Record<string, ComponentNode>;
   componentOrder: string[];                // IDの配列で順序管理
 
+  // Monaco Editor連携
+  rawHtml: string | null;                  // Monaco入力を保持（パースせず）
+  headerHtml: string;                      // マーカー前の固定HTML
+  footerHtml: string;                      // マーカー後の固定HTML
+
   // ビジュアル編集状態
   selectedComponentId: string | null;
   editingField: { componentId: string; fieldName: string } | null;
@@ -290,25 +295,38 @@ Monaco Editor → Store → VisualPreviewEditor
 
 - `updateSeq`（シーケンス番号）で変更を検知
 - 自身が発生させた変更は無視（無限ループ防止）
+- `rawHtml`パターンでMonaco入力を保持
 
 ```typescript
-const isInternalChangeRef = useRef(false);
+const isMonacoOriginRef = useRef(false);
 
 // Store変更時
 useEffect(() => {
-  if (isInternalChangeRef.current) {
-    isInternalChangeRef.current = false;
+  if (isMonacoOriginRef.current) {
+    isMonacoOriginRef.current = false;
     return;  // 自身の変更は無視
   }
+  // rawHtmlがある場合（Monaco編集中）はStore→Monaco更新をスキップ
+  if (rawHtml !== null) return;
   // 外部変更を反映
-}, [updateSeq]);
+}, [updateSeq, rawHtml]);
 
 // Monaco編集時
 debounceTimerRef.current = setTimeout(() => {
-  isInternalChangeRef.current = true;  // フラグを立てる
-  setHtml(value);
-}, 300);
+  isMonacoOriginRef.current = true;
+  setRawHtml(value);  // パースしつつrawHtmlも保存
+}, 100);
 ```
+
+### 6.3 rawHtmlパターン（2026-01-17追加）
+
+| 関数 | 用途 | rawHtml |
+|------|------|---------|
+| `setRawHtml` | Monaco編集時 | 保存（入力をそのまま維持） |
+| `setHtml` | Visual Editor編集時 | クリア |
+| `getHtml` | HTML取得 | あればそのまま返す |
+
+**目的**: Monacoで入力したHTMLをパース→再シリアライズで変形させない
 
 ---
 

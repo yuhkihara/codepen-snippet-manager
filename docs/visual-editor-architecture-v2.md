@@ -1,7 +1,7 @@
 # メールプレビュー ビジュアルエディター アーキテクチャ v2
 
 **作成日**: 2026-01-17
-**ステータス**: 設計フェーズ（レビュー反映済み）
+**ステータス**: ✅ 実装完了（2026-01-17）
 
 ---
 
@@ -11,6 +11,7 @@
 |-----------|------|----------|
 | v1 | 2026-01-17 | 初版作成 |
 | v2 | 2026-01-17 | 批判的レビュー反映: SSOT問題、レースコンディション、エラーハンドリング追加 |
+| v2.1 | 2026-01-17 | 実装完了、rawHtmlパターン追加、Monaco同期修正 |
 
 ---
 
@@ -895,37 +896,42 @@ set((state) => {
 
 ---
 
-## 9. 実装フェーズ（改訂）
+## 9. 実装フェーズ（完了）
 
-### Phase 1: 基盤構築
-- [ ] Zustand Store（AST構造）の実装
-- [ ] parseComponentFromHtml / serializeComponent
-- [ ] Shadow DOMコンテナの実装
-- [ ] 依存ライブラリのインストール（dnd-kit, tiptap）
+### Phase 1: 基盤構築 ✅
+- [x] Zustand Store（AST構造）の実装
+- [x] parseComponentFromHtml / serializeComponent
+- [x] Shadow DOMコンテナの実装
+- [x] 依存ライブラリのインストール（dnd-kit, tiptap）
 
-### Phase 2: コンポーネント選択
-- [ ] ComponentRenderer実装
-- [ ] クリックで選択状態
-- [ ] SelectionOverlay（選択枠表示）
-- [ ] キーボード操作（矢印キーで選択移動、Delete で削除）
+### Phase 2: コンポーネント選択 ✅
+- [x] ComponentRenderer実装
+- [x] クリックで選択状態
+- [x] SelectionOverlay（選択枠表示）
+- [ ] キーボード操作（矢印キーで選択移動、Delete で削除）- 未実装
 
-### Phase 3: ドラッグ&ドロップ
-- [ ] dnd-kit統合
-- [ ] DragHandle UI
-- [ ] DropIndicator
-- [ ] Monaco同期
+### Phase 3: ドラッグ&ドロップ ✅
+- [x] dnd-kit統合
+- [x] DragHandle UI
+- [x] DropIndicator
+- [x] Monaco同期
 
-### Phase 4: インラインテキスト編集
-- [ ] TipTap統合
-- [ ] ダブルクリックで編集開始
-- [ ] 改行→`<br>`変換
-- [ ] Escape/blur で編集終了
+### Phase 4: インラインテキスト編集 ✅
+- [x] TipTap統合
+- [x] ダブルクリックで編集開始
+- [x] 改行→`<br>`変換
+- [x] Escape/blur で編集終了
 
-### Phase 5: 統合・最適化
-- [ ] Undo/Redo
-- [ ] エラーハンドリング
-- [ ] パフォーマンスチューニング
-- [ ] E2Eテスト
+### Phase 5: 統合・最適化 ✅
+- [x] Undo/Redo
+- [x] エラーハンドリング
+- [x] パフォーマンスチューニング
+- [ ] E2Eテスト - 未実装
+
+### 追加実装（2026-01-17）
+- [x] rawHtmlパターン（Monaco入力を保持）
+- [x] lastIndexOf()によるネストdiv対応
+- [x] Monaco-Visual Editor双方向同期
 
 ---
 
