@@ -5,12 +5,14 @@
  *
  * Features:
  * - Drag & drop reordering with @dnd-kit
- * - Inline text editing with @tiptap
+ * - Inline text editing with contenteditable
  * - Shadow DOM for style isolation
  * - Real-time sync with Monaco Editor via Zustand store
+ * - Floating toolbar for text styling (Medium-style)
  */
 
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -31,7 +33,109 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useEmailComposerStore } from '@/store/emailComposerStore';
 import { sanitizeHTML } from '@/lib/sanitize';
-import { Trash2, GripVertical, Undo, Redo } from 'lucide-react';
+import { Trash2, GripVertical, Undo, Redo, Bold, Type } from 'lucide-react';
+
+// ===== Floating Toolbar Types =====
+
+interface StyleOption {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  htmlTemplate: string;
+}
+
+const STYLE_OPTIONS: StyleOption[] = [
+  {
+    id: 'bold',
+    label: '太字',
+    icon: <Bold className="w-4 h-4" />,
+    htmlTemplate: '<strong>{text}</strong>',
+  },
+  {
+    id: 'red',
+    label: '赤字',
+    icon: <Type className="w-4 h-4 text-red-600" />,
+    htmlTemplate: '<span style="color:#d70035;">{text}</span>',
+  },
+  {
+    id: 'blue',
+    label: '青字',
+    icon: <Type className="w-4 h-4 text-blue-600" />,
+    htmlTemplate: '<span style="color:#0086ab;">{text}</span>',
+  },
+];
+
+// ===== Floating Toolbar Component =====
+
+interface FloatingToolbarProps {
+  position: { x: number; y: number };
+  onApplyStyle: (style: StyleOption) => void;
+  onClose: () => void;
+}
+
+const FloatingToolbar = memo(function FloatingToolbar({
+  position,
+  onApplyStyle,
+  onClose,
+}: FloatingToolbarProps) {
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // ツールバー外クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    // 少し遅延させて登録
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  // 画面端でのはみ出し防止
+  const adjustedX = Math.min(position.x, window.innerWidth - 150);
+  const adjustedY = Math.max(position.y - 45, 10);
+
+  return createPortal(
+    <div
+      ref={toolbarRef}
+      className="fixed z-[9999] bg-gray-900 rounded-lg shadow-xl flex items-center gap-1 px-2 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+      style={{ left: adjustedX, top: adjustedY }}
+    >
+      {STYLE_OPTIONS.map((option) => (
+        <button
+          key={option.id}
+          onMouseDown={(e) => {
+            // 選択を維持するためpreventDefault
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onApplyStyle(option);
+          }}
+          className="p-2 rounded hover:bg-gray-700 text-white transition-colors flex items-center justify-center"
+          title={option.label}
+        >
+          {option.icon}
+        </button>
+      ))}
+      {/* 矢印 */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-gray-900"
+      />
+    </div>,
+    document.body
+  );
+});
 
 // ===== Sortable Component =====
 
@@ -70,6 +174,13 @@ const SortableComponent = memo(function SortableComponent({
   const isUpdatingRef = useRef(false);
   const lastHtmlRef = useRef<string>('');
   const [isEditing, setIsEditing] = useState(false);
+
+  // フローティングツールバー状態
+  const [toolbarState, setToolbarState] = useState<{
+    visible: boolean;
+    position: { x: number; y: number };
+    range: Range | null;
+  }>({ visible: false, position: { x: 0, y: 0 }, range: null });
 
   // Shadow DOMの初期化（一度だけ実行）
   useEffect(() => {
@@ -217,14 +328,44 @@ const SortableComponent = memo(function SortableComponent({
             const htmlEl = el as HTMLElement;
             htmlEl.contentEditable = 'true';
 
+            // マウスアップ時に選択を検出してツールバーを表示
+            const handleMouseUp = () => {
+              // 少し遅延させて選択が確定するのを待つ
+              setTimeout(() => {
+                const selection = document.getSelection();
+                if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+                  const range = selection.getRangeAt(0);
+                  const selectedText = range.toString();
+
+                  if (selectedText && selectedText.trim()) {
+                    // 選択範囲の位置を取得
+                    const rect = range.getBoundingClientRect();
+                    setToolbarState({
+                      visible: true,
+                      position: {
+                        x: rect.left + rect.width / 2 - 50,
+                        y: rect.top,
+                      },
+                      range: range.cloneRange(),
+                    });
+                  }
+                } else {
+                  // 選択がない場合はツールバーを非表示
+                  setToolbarState(prev => ({ ...prev, visible: false, range: null }));
+                }
+              }, 10);
+            };
+
             // 各要素に直接イベントリスナーを付ける
             // 入力中は同期しない。blur/keydown(Escape)時のみ同期
             htmlEl.addEventListener('blur', handleFocusOut);
             htmlEl.addEventListener('keydown', handleKeyDown);
+            htmlEl.addEventListener('mouseup', handleMouseUp);
 
             cleanupFunctions.push(() => {
               htmlEl.removeEventListener('blur', handleFocusOut);
               htmlEl.removeEventListener('keydown', handleKeyDown);
+              htmlEl.removeEventListener('mouseup', handleMouseUp);
             });
           }
         });
@@ -282,6 +423,69 @@ const SortableComponent = memo(function SortableComponent({
     }
   }, [componentId, deleteComponent]);
 
+  // フローティングツールバーでスタイル適用
+  const handleApplyStyle = useCallback((style: StyleOption) => {
+    const { range } = toolbarState;
+    if (!range || !shadowRootRef.current) {
+      setToolbarState(prev => ({ ...prev, visible: false, range: null }));
+      return;
+    }
+
+    const selectedText = range.toString();
+    if (!selectedText) {
+      setToolbarState(prev => ({ ...prev, visible: false, range: null }));
+      return;
+    }
+
+    // 選択テキストをスタイルで囲む
+    const wrappedHtml = style.htmlTemplate.replace('{text}', selectedText);
+
+    // 選択範囲を削除して新しいHTMLを挿入
+    range.deleteContents();
+
+    const temp = document.createElement('div');
+    temp.innerHTML = wrappedHtml;
+    const fragment = document.createDocumentFragment();
+    while (temp.firstChild) {
+      fragment.appendChild(temp.firstChild);
+    }
+    range.insertNode(fragment);
+
+    // 選択をクリア
+    const selection = document.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+    }
+
+    // ツールバーを閉じる
+    setToolbarState({ visible: false, position: { x: 0, y: 0 }, range: null });
+
+    // Storeに同期
+    const shadow = shadowRootRef.current;
+    const contentDiv = shadow.querySelector('.component-content');
+    if (contentDiv) {
+      isUpdatingRef.current = true;
+      const clone = contentDiv.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('[contenteditable]').forEach((el) => {
+        el.removeAttribute('contenteditable');
+      });
+      clone.classList.remove('editing');
+      const newHtml = clone.innerHTML;
+      if (newHtml !== lastHtmlRef.current) {
+        lastHtmlRef.current = newHtml;
+        updateComponentHtml(componentId, newHtml);
+      }
+      requestAnimationFrame(() => {
+        isUpdatingRef.current = false;
+      });
+    }
+  }, [toolbarState, componentId, updateComponentHtml]);
+
+  // ツールバーを閉じる
+  const handleCloseToolbar = useCallback(() => {
+    setToolbarState({ visible: false, position: { x: 0, y: 0 }, range: null });
+  }, []);
+
   if (!component) return null;
 
   return (
@@ -326,6 +530,15 @@ const SortableComponent = memo(function SortableComponent({
 
       {/* Shadow DOMコンテナ */}
       <div ref={containerRef} className="min-h-[20px]" />
+
+      {/* フローティングツールバー（テキスト選択時に表示） */}
+      {isEditing && toolbarState.visible && (
+        <FloatingToolbar
+          position={toolbarState.position}
+          onApplyStyle={handleApplyStyle}
+          onClose={handleCloseToolbar}
+        />
+      )}
     </div>
   );
 });
