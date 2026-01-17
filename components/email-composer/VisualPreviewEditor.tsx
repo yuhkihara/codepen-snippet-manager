@@ -10,7 +10,7 @@
  * - Real-time sync with Monaco Editor via Zustand store
  */
 
-import { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -29,13 +29,6 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEditor, EditorContent } from '@tiptap/react';
-import Document from '@tiptap/extension-document';
-import Paragraph from '@tiptap/extension-paragraph';
-import Text from '@tiptap/extension-text';
-import HardBreak from '@tiptap/extension-hard-break';
-import Placeholder from '@tiptap/extension-placeholder';
-import { debounce } from 'lodash-es';
 import { useEmailComposerStore } from '@/store/emailComposerStore';
 import { sanitizeHTML } from '@/lib/sanitize';
 import { Trash2, GripVertical, Undo, Redo } from 'lucide-react';
@@ -51,10 +44,8 @@ const SortableComponent = memo(function SortableComponent({
 }: SortableComponentProps) {
   const component = useEmailComposerStore((state) => state.components[componentId]);
   const selectedComponentId = useEmailComposerStore((state) => state.selectedComponentId);
-  const editingField = useEmailComposerStore((state) => state.editingField);
   const setSelectedComponentId = useEmailComposerStore((state) => state.setSelectedComponentId);
-  const setEditingField = useEmailComposerStore((state) => state.setEditingField);
-  const updateEditableText = useEmailComposerStore((state) => state.updateEditableText);
+  const updateComponentHtml = useEmailComposerStore((state) => state.updateComponentHtml);
   const deleteComponent = useEmailComposerStore((state) => state.deleteComponent);
 
   const isSelected = selectedComponentId === componentId;
@@ -76,64 +67,199 @@ const SortableComponent = memo(function SortableComponent({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
+  const isUpdatingRef = useRef(false);
+  const lastHtmlRef = useRef<string>('');
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Shadow DOMの初期化とコンテンツ更新
+  // Shadow DOMの初期化（一度だけ実行）
   useEffect(() => {
-    if (!containerRef.current || !component) return;
+    if (!containerRef.current) return;
 
     if (!shadowRootRef.current) {
       shadowRootRef.current = containerRef.current.attachShadow({ mode: 'open' });
     }
+  }, []);
+
+  // コンテンツ更新とイベントハンドラー設定
+  useEffect(() => {
+    if (!shadowRootRef.current || !component) return;
 
     const shadow = shadowRootRef.current;
-
-    // スタイル
-    const styleContent = `
-      :host {
-        display: block;
-      }
-      * { box-sizing: border-box; }
-      [data-editable] {
-        cursor: text;
-        transition: background-color 0.15s ease;
-        border-radius: 2px;
-      }
-      [data-editable]:hover {
-        background-color: rgba(59, 130, 246, 0.1);
-      }
-    `;
-
-    // innerHtmlをそのまま使用（editableFieldsの値は既にinnerHtmlに反映済み）
     const html = component.innerHtml;
+    const htmlChanged = lastHtmlRef.current !== html;
 
-    // XSS防止: HTMLをサニタイズしてから挿入
-    shadow.innerHTML = `
-      <style>${styleContent}</style>
-      <div class="component-content">${sanitizeHTML(html)}</div>
-    `;
+    // 編集中かつ自分の更新の場合はDOM再描画をスキップ（編集内容を保持）
+    // ただしイベントリスナーのセットアップは常に行う
+    const shouldSkipRerender = isEditing && isUpdatingRef.current;
 
-    // ダブルクリックイベント
-    const handleDblClick = (e: Event) => {
-      const target = e.target as HTMLElement;
-      const editableEl = target.closest('[data-editable]') as HTMLElement | null;
-      if (editableEl) {
-        const fieldName = editableEl.getAttribute('data-editable');
-        if (fieldName) {
-          setEditingField({ componentId, fieldName });
+    // HTMLが変わった場合のみコンテンツを再描画（編集中の自己更新はスキップ）
+    if (!shouldSkipRerender && (htmlChanged || !shadow.querySelector('.component-content'))) {
+      lastHtmlRef.current = html;
+
+      const styleContent = `
+        :host { display: block; }
+        * { box-sizing: border-box; }
+        .component-content.editing { cursor: text; }
+        .component-content.editing [contenteditable="true"]:focus {
+          outline: 2px solid #3b82f6;
+          outline-offset: 2px;
+          border-radius: 2px;
+        }
+        .component-content.editing [contenteditable="true"]:hover {
+          background-color: rgba(59, 130, 246, 0.1);
+        }
+        .component-content h1, .component-content h2, .component-content h3,
+        .component-content h4, .component-content h5, .component-content h6,
+        .component-content p, .component-content span, .component-content td,
+        .component-content th, .component-content li, .component-content label {
+          min-height: 1em;
+        }
+      `;
+
+      shadow.innerHTML = `
+        <style>${styleContent}</style>
+        <div class="component-content${isEditing ? ' editing' : ''}">${sanitizeHTML(html)}</div>
+      `;
+    }
+
+    // クラスの更新（編集モード切替時）
+    const contentDiv = shadow.querySelector('.component-content');
+    if (contentDiv) {
+      if (isEditing) {
+        contentDiv.classList.add('editing');
+      } else {
+        contentDiv.classList.remove('editing');
+        shadow.querySelectorAll('[contenteditable]').forEach((el) => {
+          el.removeAttribute('contenteditable');
+        });
+      }
+    }
+
+    // === イベントハンドラー設定（常に実行）===
+
+    // 編集内容をストアに同期する関数
+    const syncToStore = () => {
+      const contentDiv = shadow.querySelector('.component-content');
+      if (!contentDiv) return;
+
+      isUpdatingRef.current = true;
+      const clone = contentDiv.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('[contenteditable]').forEach((el) => {
+        el.removeAttribute('contenteditable');
+      });
+      clone.classList.remove('editing');
+      const newHtml = clone.innerHTML;
+
+      if (newHtml !== lastHtmlRef.current) {
+        lastHtmlRef.current = newHtml;
+        updateComponentHtml(componentId, newHtml);
+      }
+
+      requestAnimationFrame(() => {
+        isUpdatingRef.current = false;
+      });
+    };
+
+    let inputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const cleanupFunctions: (() => void)[] = [];
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // < と > をエスケープ（HTMLタグとして解釈されるのを防止）
+      if (e.key === '<' || e.key === '>') {
+        e.preventDefault();
+        const entity = e.key === '<' ? '&lt;' : '&gt;';
+        document.execCommand('insertHTML', false, entity);
+        setTimeout(syncToStore, 10);
+        return;
+      }
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const target = e.target as HTMLElement;
+        if (target.isContentEditable) {
+          e.preventDefault();
+          const selection = document.getSelection();
+          if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+            selection.collapseToEnd();
+          }
+          document.execCommand('insertHTML', false, '<br>');
+          setTimeout(syncToStore, 10);
         }
       }
+      if (e.key === 'Escape') {
+        setIsEditing(false);
+      }
     };
 
-    shadow.addEventListener('dblclick', handleDblClick);
+    const handleInput = () => {
+      if (inputDebounceTimer) clearTimeout(inputDebounceTimer);
+      inputDebounceTimer = setTimeout(syncToStore, 100);
+    };
+
+    const handleFocusOut = () => {
+      if (inputDebounceTimer) {
+        clearTimeout(inputDebounceTimer);
+        inputDebounceTimer = null;
+      }
+      syncToStore();
+    };
+
+    // 編集モード時は各contenteditable要素に直接イベントリスナーを付ける
+    if (isEditing) {
+      const editableTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
+
+      editableTags.forEach((tag) => {
+        shadow.querySelectorAll(`.component-content ${tag}`).forEach((el) => {
+          // data-editableがある要素、または子要素がBRのみの要素を編集可能に
+          const hasOnlyBrOrTextChildren = Array.from(el.childNodes).every(
+            (node) => node.nodeType === Node.TEXT_NODE ||
+                      (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'BR')
+          );
+          const isEditable = el.hasAttribute('data-editable') ||
+                             (hasOnlyBrOrTextChildren && el.textContent?.trim());
+
+          if (isEditable) {
+            const htmlEl = el as HTMLElement;
+            htmlEl.contentEditable = 'true';
+
+            // 各要素に直接イベントリスナーを付ける
+            htmlEl.addEventListener('input', handleInput);
+            htmlEl.addEventListener('blur', handleFocusOut);
+            htmlEl.addEventListener('keydown', handleKeyDown);
+
+            cleanupFunctions.push(() => {
+              htmlEl.removeEventListener('input', handleInput);
+              htmlEl.removeEventListener('blur', handleFocusOut);
+              htmlEl.removeEventListener('keydown', handleKeyDown);
+            });
+          }
+        });
+      });
+    }
 
     return () => {
-      shadow.removeEventListener('dblclick', handleDblClick);
+      cleanupFunctions.forEach(fn => fn());
+      if (inputDebounceTimer) clearTimeout(inputDebounceTimer);
     };
-  }, [component, componentId, setEditingField]);
+    // component?.innerHtmlのみに依存（componentオブジェクト全体ではなく）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [component?.innerHtml, isEditing, componentId, updateComponentHtml]);
+
+  // 選択解除時に編集モードも解除
+  useEffect(() => {
+    if (!isSelected) {
+      setIsEditing(false);
+    }
+  }, [isSelected]);
 
   const handleSelect = useCallback(() => {
     setSelectedComponentId(componentId);
   }, [componentId, setSelectedComponentId]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (isSelected) {
+      setIsEditing(true);
+    }
+  }, [isSelected]);
 
   const handleDelete = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -150,10 +276,13 @@ const SortableComponent = memo(function SortableComponent({
       style={style}
       className={`relative group rounded-lg transition-all ${
         isSelected
-          ? 'ring-2 ring-blue-500 ring-offset-2'
+          ? isEditing
+            ? 'ring-2 ring-green-500 ring-offset-2'
+            : 'ring-2 ring-blue-500 ring-offset-2'
           : 'hover:ring-1 hover:ring-gray-300'
       }`}
       onClick={handleSelect}
+      onDoubleClick={handleDoubleClick}
     >
       {/* ツールバー */}
       <div
@@ -183,123 +312,9 @@ const SortableComponent = memo(function SortableComponent({
 
       {/* Shadow DOMコンテナ */}
       <div ref={containerRef} className="min-h-[20px]" />
-
-      {/* インラインエディタ（編集中のフィールドがある場合） */}
-      {editingField && editingField.componentId === componentId && (
-        <InlineEditor
-          componentId={componentId}
-          fieldName={editingField.fieldName}
-          initialValue={component.editableFields[editingField.fieldName]?.value || ''}
-          onTextChange={updateEditableText}
-          onComplete={() => setEditingField(null)}
-        />
-      )}
     </div>
   );
 });
-
-// ===== Inline Editor (TipTap) =====
-
-interface InlineEditorProps {
-  componentId: string;
-  fieldName: string;
-  initialValue: string;
-  onTextChange: (componentId: string, fieldName: string, text: string) => void;
-  onComplete: () => void;
-}
-
-function InlineEditor({
-  componentId,
-  fieldName,
-  initialValue,
-  onTextChange,
-  onComplete,
-}: InlineEditorProps) {
-  const debouncedChange = useMemo(
-    () =>
-      debounce((text: string) => {
-        onTextChange(componentId, fieldName, text);
-      }, 150),
-    [componentId, fieldName, onTextChange]
-  );
-
-  const editor = useEditor({
-    extensions: [
-      Document,
-      Paragraph,
-      Text,
-      HardBreak,
-      Placeholder.configure({
-        placeholder: 'テキストを入力...',
-      }),
-    ],
-    content: `<p>${initialValue.replace(/\n/g, '</p><p>')}</p>`,
-    editorProps: {
-      attributes: {
-        class: 'outline-none min-h-[1em] p-3 prose prose-sm max-w-none',
-      },
-    },
-    onUpdate: ({ editor }) => {
-      const text = editor.getText();
-      debouncedChange(text);
-    },
-    immediatelyRender: false,
-  });
-
-  // Escapeで編集終了
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onComplete();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onComplete]);
-
-  // 自動フォーカス
-  useEffect(() => {
-    editor?.commands.focus('end');
-  }, [editor]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl p-5 w-full max-w-lg mx-4">
-        <div className="text-sm text-gray-500 mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          編集中: <span className="font-mono text-green-600">{fieldName}</span>
-        </div>
-        <div className="border-2 border-green-200 rounded-lg overflow-hidden bg-gray-50">
-          <EditorContent editor={editor} />
-        </div>
-        <p className="text-xs text-gray-400 mt-2">
-          改行は自動的に &lt;br&gt; に変換されます
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onComplete}
-            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            閉じる (Esc)
-          </button>
-          <button
-            onClick={() => {
-              if (editor) {
-                onTextChange(componentId, fieldName, editor.getText());
-              }
-              onComplete();
-            }}
-            className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            保存して閉じる
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ===== Main Component =====
 
 export default function VisualPreviewEditor() {
   const componentOrder = useEmailComposerStore((state) => state.componentOrder);
@@ -431,7 +446,7 @@ export default function VisualPreviewEditor() {
             ビジュアルエディター
           </h2>
           <p className="text-xs text-gray-500 mt-1 ml-3">
-            ドラッグで並び替え / ダブルクリックでテキスト編集
+            ドラッグで並び替え / 選択後ダブルクリックで編集モード
           </p>
         </div>
         <div className="flex items-center gap-2">

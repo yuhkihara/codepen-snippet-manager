@@ -445,6 +445,55 @@ snippet-manager/
 
 **詳細**: [トラブルシューティング](./TROUBLESHOOTING.md)
 
+### Monaco-Visual Editor同期とHTMLパース問題（✅ 完全解決）
+
+**問題**: ネストされた`</div>`タグで正規表現がHTMLを破損
+
+**原因**:
+```javascript
+// 非貪欲マッチ [\s\S]*? は最初の</div>で止まってしまう
+/<div data-component-id="...">([\s\S]*?)<\/div>/
+```
+
+例:
+```html
+<div data-component-id="123">
+  <div>ネスト内容</div>  ← ここで止まる！
+  続き
+</div>  ← 本当はここまで
+```
+
+**解決策**: コメントマーカー方式
+
+HTMLコメントはネスト不可能という特性を活用:
+```html
+<!-- component:UUID -->
+  ...どんなにネストしても安全...
+<!-- /component:UUID -->
+```
+
+**実装**:
+```javascript
+// 1. コメントマーカーで範囲を特定（コメントはネストしない）
+const markerRegex = /<!-- component:([\w-]+) -->([\s\S]*?)<!-- \/component:\1 -->/g;
+
+// 2. 範囲内で開始タグと最後の</div>を見つける
+const openTagMatch = innerContent.match(
+  /<div\s+data-component-id="([^"]+)"\s+data-component-type="([^"]+)">/
+);
+const lastDivCloseIndex = innerContent.lastIndexOf('</div>');
+
+// 3. 開始タグの後から最後の</div>の前までを抽出
+const componentHtml = innerContent.substring(openTagEnd, lastDivCloseIndex);
+```
+
+**アーキテクチャ**:
+- `setRawHtml`: Monaco編集時に使用。生HTMLを保存しつつコンポーネントもパース
+- `setHtml`: Visual Editor編集時に使用。rawHtmlをクリア
+- `getHtml`: rawHtmlがあればそのまま返す（Monaco入力を壊さない）
+
+**詳細**: [トラブルシューティング](./TROUBLESHOOTING.md)
+
 ---
 
 ## ✅ リリース判定
@@ -479,4 +528,4 @@ snippet-manager/
 
 ---
 
-**Last Updated**: 2026-01-17
+**Last Updated**: 2026-01-17 (Monaco-Visual Editor同期問題解決)

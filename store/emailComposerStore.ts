@@ -46,6 +46,9 @@ interface EmailComposerStore {
   headerHtml: string;
   footerHtml: string;
 
+  // Monaco Editorからの生HTML（パースせずに保存）
+  rawHtml: string | null;
+
   // AST構造によるコンポーネント管理
   components: Record<string, ComponentNode>;
   componentOrder: string[];
@@ -89,6 +92,7 @@ interface EmailComposerStore {
   deleteComponent: (componentId: string) => void;
   reorderComponents: (fromIndex: number, toIndex: number) => void;
   updateEditableText: (componentId: string, fieldName: string, text: string) => void;
+  updateComponentHtml: (componentId: string, html: string) => void;
 
   // ビジュアル編集状態
   setSelectedComponentId: (id: string | null) => void;
@@ -97,6 +101,7 @@ interface EmailComposerStore {
 
   // HTML操作（Monaco Editor連携）
   setHtml: (html: string) => void;
+  setRawHtml: (html: string) => void;  // パースせずに生HTMLを保存
   getHtml: () => string;
 
   // 後方互換性（既存コード用）
@@ -210,21 +215,10 @@ function parseComponentFromHtml(
 
 /**
  * コンポーネントをHTMLにシリアライズ（元のフォーマットを保持）
+ * innerHtmlをそのまま使用（editableFieldsによる上書きは行わない）
  */
 function serializeComponent(component: ComponentNode): string {
-  let html = component.innerHtml;
-
-  // editableFieldsの値をHTMLに反映（正規表現で元のフォーマットを保持）
-  Object.entries(component.editableFields).forEach(([name, field]) => {
-    const regex = new RegExp(
-      `(<[^>]+data-editable="${name}"[^>]*>)([\\s\\S]*?)(</)`,
-      'i'
-    );
-    const escapedValue = escapeHtml(field.value).replace(/\n/g, '<br>');
-    html = html.replace(regex, `$1${escapedValue}$3`);
-  });
-
-  return `<!-- component:${component.id} -->\n<div data-component-id="${component.id}" data-component-type="${component.type}">\n${html}\n</div>\n<!-- /component:${component.id} -->`;
+  return `<!-- component:${component.id} -->\n<div data-component-id="${component.id}" data-component-type="${component.type}">\n${component.innerHtml}\n</div>\n<!-- /component:${component.id} -->`;
 }
 
 /**
@@ -284,20 +278,28 @@ function parseHtmlToComponents(html: string): {
     hasMarkers = true;
     const [, id, innerContent] = match;
 
-    // 内部のdivからHTMLを抽出
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(innerContent, 'text/html');
-    const componentDiv = doc.querySelector('[data-component-id]');
+    // 開始タグを検出
+    const openTagMatch = innerContent.match(
+      /<div\s+data-component-id="([^"]+)"\s+data-component-type="([^"]+)">/
+    );
 
-    if (componentDiv) {
-      const componentHtml = componentDiv.innerHTML;
-      const componentType = componentDiv.getAttribute('data-component-type') || 'unknown';
+    if (openTagMatch) {
+      const componentType = openTagMatch[2];
+      const openTagEnd = innerContent.indexOf(openTagMatch[0]) + openTagMatch[0].length;
 
-      const component = parseComponentFromHtml(componentHtml, id);
-      component.type = componentType;
+      // 最後の</div>を見つける（ラッパーdivの閉じタグ）
+      const lastDivCloseIndex = innerContent.lastIndexOf('</div>');
 
-      components[id] = component;
-      componentOrder.push(id);
+      if (lastDivCloseIndex > openTagEnd) {
+        // 開始タグの後から最後の</div>の前までがコンテンツ
+        const componentHtml = innerContent.substring(openTagEnd, lastDivCloseIndex);
+
+        const component = parseComponentFromHtml(componentHtml.trim(), id);
+        component.type = componentType;
+
+        components[id] = component;
+        componentOrder.push(id);
+      }
     }
   }
 
@@ -345,6 +347,7 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     isDirty: false,
     headerHtml: '',
     footerHtml: '',
+    rawHtml: null,
     components: {},
     componentOrder: [],
     selectedComponentId: null,
@@ -366,6 +369,7 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         state.isDirty = false;
         state.headerHtml = headerHtml;
         state.footerHtml = footerHtml;
+        state.rawHtml = template.html;  // 生HTMLも保存
         state.components = components;
         state.componentOrder = componentOrder;
         state.selectedComponentId = null;
@@ -384,6 +388,7 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         state.isDirty = false;
         state.headerHtml = '';
         state.footerHtml = '';
+        state.rawHtml = null;
         state.components = {};
         state.componentOrder = [];
         state.selectedComponentId = null;
@@ -448,6 +453,9 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
           state.componentOrder.push(id);
         }
 
+        // rawHtmlをクリア（Monacoに反映させるため）
+        state.rawHtml = null;
+
         state.isDirty = true;
         state.updateSeq++;
       });
@@ -483,6 +491,9 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
           state.editingField = null;
         }
 
+        // rawHtmlをクリア（Monacoに反映させるため）
+        state.rawHtml = null;
+
         state.isDirty = true;
         state.updateSeq++;
       });
@@ -511,6 +522,9 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
         // 並び替え
         const [removed] = state.componentOrder.splice(fromIndex, 1);
         state.componentOrder.splice(toIndex, 0, removed);
+
+        // rawHtmlをクリア（Monacoに反映させるため）
+        state.rawHtml = null;
 
         state.isDirty = true;
         state.updateSeq++;
@@ -550,6 +564,49 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
 
         // テキスト更新
         component.editableFields[fieldName] = { name: fieldName, value: text };
+
+        // rawHtmlをクリア（Monacoに反映させるため）
+        state.rawHtml = null;
+
+        state.isDirty = true;
+        state.updateSeq++;
+      });
+    },
+
+    updateComponentHtml: (componentId, html) => {
+      set((state) => {
+        const component = state.components[componentId];
+        if (!component) return;
+
+        const lastEntry = state.history.past[state.history.past.length - 1];
+
+        // デバウンス: 直近の変更は履歴を統合
+        if (
+          lastEntry &&
+          lastEntry.type === 'html_change' &&
+          Date.now() - lastEntry.timestamp < HISTORY_DEBOUNCE_MS
+        ) {
+          lastEntry.timestamp = Date.now();
+        } else {
+          state.history.past.push({
+            type: 'html_change',
+            timestamp: Date.now(),
+            snapshot: {
+              components: JSON.parse(JSON.stringify(state.components)),
+              componentOrder: [...state.componentOrder],
+            },
+          });
+          if (state.history.past.length > MAX_HISTORY_SIZE) {
+            state.history.past.shift();
+          }
+        }
+        state.history.future = [];
+
+        // HTMLを直接更新
+        component.innerHtml = html;
+
+        // rawHtmlをクリア（Visual Editorからの変更をMonacoに反映させるため）
+        state.rawHtml = null;
 
         state.isDirty = true;
         state.updateSeq++;
@@ -592,6 +649,22 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
 
         state.headerHtml = headerHtml;
         state.footerHtml = footerHtml;
+        state.rawHtml = null;  // パース時はrawHtmlをクリア
+        state.components = components;
+        state.componentOrder = componentOrder;
+        state.isDirty = true;
+        state.updateSeq++;
+      });
+    },
+
+    // Monaco Editorからの生HTML保存（パースしてコンポーネントも更新）
+    setRawHtml: (html) => {
+      const { components, componentOrder, headerHtml, footerHtml } = parseHtmlToComponents(html);
+
+      set((state) => {
+        state.rawHtml = html;
+        state.headerHtml = headerHtml;
+        state.footerHtml = footerHtml;
         state.components = components;
         state.componentOrder = componentOrder;
         state.isDirty = true;
@@ -600,7 +673,12 @@ export const useEmailComposerStore = create<EmailComposerStore>()(
     },
 
     getHtml: () => {
-      const { components, componentOrder, headerHtml, footerHtml } = get();
+      const { rawHtml, components, componentOrder, headerHtml, footerHtml } = get();
+
+      // rawHtmlがある場合はそのまま返す（Monaco編集中）
+      if (rawHtml !== null) {
+        return rawHtml;
+      }
 
       // コンポーネント部分を生成
       const componentsHtml = componentOrder

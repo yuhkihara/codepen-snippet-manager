@@ -8,9 +8,10 @@ import { toast } from 'sonner';
 
 export default function EmailCodeEditor() {
   const getHtml = useEmailComposerStore((state) => state.getHtml);
-  const setHtml = useEmailComposerStore((state) => state.setHtml);
+  const setRawHtml = useEmailComposerStore((state) => state.setRawHtml);
   const addComponent = useEmailComposerStore((state) => state.addComponent);
   const updateSeq = useEmailComposerStore((state) => state.updateSeq);
+  const rawHtml = useEmailComposerStore((state) => state.rawHtml);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -19,14 +20,27 @@ export default function EmailCodeEditor() {
   const dragCounterRef = useRef(0);
   const isDraggingRef = useRef(false);
   const lastSyncedSeqRef = useRef(0);
-  const isInternalChangeRef = useRef(false);
+  // フラグ: Monaco自身からのsetRawHtml後はuseEffectでの更新をスキップ
+  const isMonacoOriginRef = useRef(false);
 
-  // Store変更時にMonacoを更新（外部からの変更のみ）
+  // 初期値（マウント時のみ使用）
+  const initialHtml = useRef(getHtml());
+
+  // Store変更時にMonacoを更新（ビジュアルエディターからの変更のみ）
   useEffect(() => {
     if (!editorRef.current) return;
     if (lastSyncedSeqRef.current === updateSeq) return;
-    if (isInternalChangeRef.current) {
-      isInternalChangeRef.current = false;
+
+    // Monaco自身からの更新の場合はスキップ
+    if (isMonacoOriginRef.current) {
+      isMonacoOriginRef.current = false;
+      lastSyncedSeqRef.current = updateSeq;
+      return;
+    }
+
+    // rawHtmlがある場合（Monaco編集中）はStore→Monaco更新をスキップ
+    // VisualEditorからの変更時のみ（rawHtml === null）Monacoを更新
+    if (rawHtml !== null) {
       lastSyncedSeqRef.current = updateSeq;
       return;
     }
@@ -44,19 +58,18 @@ export default function EmailCodeEditor() {
       const scrollTop = editor.getScrollTop();
       const scrollLeft = editor.getScrollLeft();
 
-      // 更新をバッチ処理してスクロールジャンプを防止
+      // エディターを更新
       editor.executeEdits('external-update', [{
         range: model.getFullModelRange(),
         text: html,
         forceMoveMarkers: false,
       }]);
 
-      // 次のフレームでカーソル位置とスクロール位置を復元
+      // カーソルとスクロール位置を復元
       requestAnimationFrame(() => {
         if (!editorRef.current) return;
         const lineCount = model.getLineCount();
 
-        // カーソル位置を復元
         if (position) {
           editorRef.current.setPosition({
             lineNumber: Math.min(position.lineNumber, lineCount),
@@ -64,28 +77,31 @@ export default function EmailCodeEditor() {
           });
         }
 
-        // スクロール位置を復元
         editorRef.current.setScrollTop(scrollTop);
         editorRef.current.setScrollLeft(scrollLeft);
       });
     }
 
     lastSyncedSeqRef.current = updateSeq;
-  }, [updateSeq, getHtml]);
+  }, [updateSeq, getHtml, rawHtml]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
 
-    // デバウンス処理（300ms）
+    // 文字数を即座に更新
+    setCharCount(value.length);
+
+    // デバウンス処理（100ms - 短めに設定）
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      isInternalChangeRef.current = true;
-      setHtml(value);
-    }, 300);
-  }, [setHtml]);
+      // Monaco起源フラグを立ててからsetRawHtml
+      isMonacoOriginRef.current = true;
+      setRawHtml(value);
+    }, 100);
+  }, [setRawHtml]);
 
   const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
@@ -179,8 +195,13 @@ export default function EmailCodeEditor() {
     };
   }, []);
 
-  // 現在のHTMLを取得
-  const currentHtml = getHtml();
+  // 文字数表示用
+  const [charCount, setCharCount] = useState(initialHtml.current.length);
+
+  // 文字数を更新
+  useEffect(() => {
+    setCharCount(getHtml().length);
+  }, [updateSeq, getHtml]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -195,7 +216,7 @@ export default function EmailCodeEditor() {
           </p>
         </div>
         <div className="text-xs text-gray-400">
-          {currentHtml.length} 文字
+          {charCount} 文字
         </div>
       </div>
       <div
@@ -223,7 +244,7 @@ export default function EmailCodeEditor() {
         <Editor
           height="100%"
           defaultLanguage="html"
-          value={currentHtml}
+          defaultValue={initialHtml.current}
           onChange={handleEditorChange}
           onMount={handleEditorDidMount}
           theme="vs-dark"

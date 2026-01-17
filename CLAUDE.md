@@ -168,6 +168,7 @@ Skills are located in `.claude/skills/`:
 | [design-review](.claude/skills/design-review.skill.md) | `/design-review` | Review UI for "AI Slop" aesthetics |
 | [check-spec](.claude/skills/check-spec.skill.md) | `/check-spec` | Verify implementation against spec |
 | [audit](.claude/skills/audit.skill.md) | `/audit` | Comprehensive code audit |
+| [test-pages](.claude/skills/test-pages.skill.md) | - | Test pages for local development (e.g., `/test/composer`) |
 
 ### Usage
 

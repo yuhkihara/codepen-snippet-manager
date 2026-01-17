@@ -495,6 +495,47 @@
 
 ---
 
+## Monaco-Visual Editor同期修正 ✅ (2026-01-17)
+
+### 問題
+- MonacoでHTMLを編集するとコンテンツが破損する
+- ネストされた`<div>`タグが途中で切れる
+- Monaco編集内容がVisual Editorに反映されない
+
+### 根本原因
+正規表現の非貪欲マッチ`[\s\S]*?`がネストされたタグで問題を起こしていた。
+
+```javascript
+// 問題のあった正規表現
+/<div data-component-id="...">([\\s\\S]*?)<\\/div>/
+```
+
+### 解決策
+
+#### 1. `lastIndexOf()`によるタグマッチング ✅
+- **ファイル**: `store/emailComposerStore.ts`
+- コメントマーカーで範囲を特定後、`lastIndexOf('</div>')`で最後の閉じタグを検出
+- 正規表現の限界（括弧の対応を数えられない）を回避
+
+#### 2. `rawHtml`パターン ✅
+- **ファイル**: `store/emailComposerStore.ts`
+- `rawHtml: string | null`フィールドを追加
+- `setRawHtml`はHTMLをパースしつつ、rawHtmlを保持
+- `getHtml()`はrawHtmlがあればそのまま返す
+
+#### 3. 同期ルール ✅
+| 関数 | 用途 | rawHtml |
+|------|------|---------|
+| `setRawHtml` | Monaco編集時 | 保存（入力をそのまま維持） |
+| `setHtml` | Visual Editor編集時 | クリア |
+| `getHtml` | HTML取得 | あればそのまま返す |
+
+### 関連ドキュメント
+- [email-composer-spec.md](email-composer-spec.md) - 「Monaco-Visual Editor同期とHTMLパース問題」セクション
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - 「Monaco-Visual Editor同期問題」セクション
+
+---
+
 ## 関連ドキュメント一覧
 
 | ドキュメント | 内容 | 最終更新 |
@@ -502,13 +543,13 @@
 | [codepen_html.md](./codepen_html.md) | 完全な実装仕様書（SSOT） | 2026-01-17 |
 | [implementation_plan.md](./implementation_plan.md) | フェーズ別実装計画 | 2025-11-17 |
 | [architecture-diagram.md](./architecture-diagram.md) | システム構成とデータフロー | 2025-11-17 |
-| [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2025-11-17 |
+| [email-composer-spec.md](./email-composer-spec.md) | HTMLメールコンポーザーの詳細仕様 | 2026-01-17 |
 | [visual-editor-spec.md](./visual-editor-spec.md) | ビジュアルエディター機能の詳細仕様 | 2026-01-17 |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能の解決ガイド | 2025-11-17 |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | React Error #418、ドロップ機能、Monaco同期の解決ガイド | 2026-01-17 |
 | [audits/](./audits/) | コード監査レポート一覧 | 継続更新 |
 | [../README.md](../README.md) | プロジェクト全体概要 | 2025-11-16 |
 
 ---
 
 **Last Updated**: 2026-01-17
-**Update**: Added Phase 10 (Visual Editor), updated documentation links
+**Update**: Added Monaco-Visual Editor sync fix documentation
