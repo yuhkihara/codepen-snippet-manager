@@ -312,6 +312,7 @@ const SortableComponent = memo(function SortableComponent({
 
     // 編集モード時は各contenteditable要素に直接イベントリスナーを付ける
     if (isEditing) {
+      console.log('[FloatingToolbar] isEditing=true, setting up event listeners');
       const editableTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
 
       editableTags.forEach((tag) => {
@@ -327,19 +328,31 @@ const SortableComponent = memo(function SortableComponent({
           if (isEditable) {
             const htmlEl = el as HTMLElement;
             htmlEl.contentEditable = 'true';
+            console.log('[FloatingToolbar] Made contenteditable:', htmlEl.tagName, htmlEl.textContent?.substring(0, 30));
 
             // マウスアップ時に選択を検出してツールバーを表示
             const handleMouseUp = () => {
+              console.log('[FloatingToolbar] mouseup fired on:', htmlEl.tagName);
               // 少し遅延させて選択が確定するのを待つ
               setTimeout(() => {
                 const selection = document.getSelection();
+                console.log('[FloatingToolbar] selection:', selection);
+                console.log('[FloatingToolbar] isCollapsed:', selection?.isCollapsed);
+                console.log('[FloatingToolbar] rangeCount:', selection?.rangeCount);
+
                 if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
                   const range = selection.getRangeAt(0);
                   const selectedText = range.toString();
+                  console.log('[FloatingToolbar] selectedText:', selectedText);
 
                   if (selectedText && selectedText.trim()) {
                     // 選択範囲の位置を取得
                     const rect = range.getBoundingClientRect();
+                    console.log('[FloatingToolbar] rect:', rect);
+                    console.log('[FloatingToolbar] showing toolbar at:', {
+                      x: rect.left + rect.width / 2 - 50,
+                      y: rect.top,
+                    });
                     setToolbarState({
                       visible: true,
                       position: {
@@ -350,6 +363,7 @@ const SortableComponent = memo(function SortableComponent({
                     });
                   }
                 } else {
+                  console.log('[FloatingToolbar] no valid selection, hiding toolbar');
                   // 選択がない場合はツールバーを非表示
                   setToolbarState(prev => ({ ...prev, visible: false, range: null }));
                 }
