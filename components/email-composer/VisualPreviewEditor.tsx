@@ -335,7 +335,17 @@ const SortableComponent = memo(function SortableComponent({
               console.log('[FloatingToolbar] mouseup fired on:', htmlEl.tagName);
               // 少し遅延させて選択が確定するのを待つ
               setTimeout(() => {
-                const selection = document.getSelection();
+                // Shadow DOM内の選択を取得
+                // ShadowRoot.getSelection()は実験的APIだが、Shadow DOM内の選択取得に必要
+                const shadowRoot = shadowRootRef.current;
+                const shadowWithSelection = shadowRoot as ShadowRoot & { getSelection?: () => Selection | null };
+                let selection = shadowWithSelection?.getSelection?.();
+
+                // フォールバック: document.getSelectionを試す
+                if (!selection) {
+                  selection = document.getSelection();
+                }
+
                 console.log('[FloatingToolbar] selection:', selection);
                 console.log('[FloatingToolbar] isCollapsed:', selection?.isCollapsed);
                 console.log('[FloatingToolbar] rangeCount:', selection?.rangeCount);
