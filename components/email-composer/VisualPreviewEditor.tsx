@@ -192,7 +192,6 @@ const SortableComponent = memo(function SortableComponent({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    selection: Selection;
     range: Range;
   } | null>(null);
 
@@ -354,6 +353,51 @@ const SortableComponent = memo(function SortableComponent({
           }
         });
       });
+
+      // Shadow DOM内でのcontextmenuイベントをキャプチャ
+      const handleShadowContextMenu = (e: Event) => {
+        const mouseEvent = e as MouseEvent;
+
+        // Shadow DOM内の選択を取得
+        // getSelection()はShadow DOM内では特殊な処理が必要
+        // ShadowRoot.getSelection()は実験的APIのため型定義を拡張
+        const shadowWithSelection = shadow as ShadowRoot & { getSelection?: () => Selection | null };
+        const selection = shadowWithSelection.getSelection
+          ? shadowWithSelection.getSelection()
+          : document.getSelection();
+
+        if (!selection || selection.isCollapsed || !selection.rangeCount) {
+          // 選択テキストがない場合はデフォルト動作
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+
+        if (!selectedText || selectedText.trim() === '') {
+          // 選択テキストが空の場合はデフォルト動作
+          return;
+        }
+
+        // デフォルトのコンテキストメニューを抑制
+        mouseEvent.preventDefault();
+        mouseEvent.stopPropagation();
+
+        // コンテキストメニューを表示
+        setContextMenu({
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+          range: range.cloneRange(),
+        });
+      };
+
+      const contentDiv = shadow.querySelector('.component-content');
+      if (contentDiv) {
+        contentDiv.addEventListener('contextmenu', handleShadowContextMenu);
+        cleanupFunctions.push(() => {
+          contentDiv.removeEventListener('contextmenu', handleShadowContextMenu);
+        });
+      }
     }
 
     return () => {
@@ -406,50 +450,6 @@ const SortableComponent = memo(function SortableComponent({
       deleteComponent(componentId);
     }
   }, [componentId, deleteComponent]);
-
-  // 右クリックでコンテキストメニュー表示（編集モード時のみ）
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    // 編集モードでない場合はデフォルト動作
-    if (!isEditing) return;
-
-    // Shadow DOM内の選択を取得
-    const selection = document.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      // 選択テキストがない場合はデフォルト動作
-      return;
-    }
-
-    // 選択がShadow DOM内かどうか確認
-    const range = selection.getRangeAt(0);
-    const shadowRoot = shadowRootRef.current;
-    if (!shadowRoot) return;
-
-    // 選択されたテキストがShadow DOM内にあるか確認
-    const startContainer = range.startContainer;
-    let isInShadow = false;
-    let node: Node | null = startContainer;
-    while (node) {
-      if (node === shadowRoot) {
-        isInShadow = true;
-        break;
-      }
-      node = node.parentNode;
-    }
-
-    if (!isInShadow) return;
-
-    // デフォルトのコンテキストメニューを抑制
-    e.preventDefault();
-    e.stopPropagation();
-
-    // コンテキストメニューを表示
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      selection,
-      range: range.cloneRange(),
-    });
-  }, [isEditing]);
 
   // コンテキストメニュー項目選択時の処理
   const handleContextMenuSelect = useCallback((item: ContextMenuItem) => {
@@ -531,7 +531,6 @@ const SortableComponent = memo(function SortableComponent({
         }`}
         onClick={handleSelect}
         onDoubleClick={handleDoubleClick}
-        onContextMenu={handleContextMenu}
       >
         {/* ツールバー */}
         <div
