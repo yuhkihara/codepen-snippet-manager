@@ -459,10 +459,10 @@ if (state.history.past.length > MAX_HISTORY_SIZE) {
 }
 ```
 
-### 11.4 テキスト変更デバウンス
+### 11.4 テキスト変更タイミング
 
-- TipTap → Store: 150ms
-- Monaco → Store: 300ms
+- Visual Editor → Store: 編集完了時のみ（blur/Escape/選択解除）
+- Monaco → Store: 100msデバウンス
 - 履歴統合: 500ms以内の連続変更
 
 ---
