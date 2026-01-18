@@ -333,21 +333,21 @@ export default function TextStyleSettings() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <GripVertical className="w-4 h-4 text-gray-400" />
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     <div
-                      className="w-6 h-6 rounded flex items-center justify-center"
+                      className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: style.icon_color + '20' }}
                     >
                       <Type className="w-4 h-4" style={{ color: style.icon_color }} />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="font-medium text-gray-900">{style.name}</div>
-                      <div className="text-xs text-gray-500 font-mono truncate max-w-[200px] sm:max-w-[300px]">
+                      <div className="text-xs text-gray-500 font-mono truncate">
                         {style.html_template}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-shrink-0">
                       <button
                         onClick={() => {
                           setEditingId(style.id);
