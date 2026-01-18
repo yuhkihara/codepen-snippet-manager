@@ -341,9 +341,9 @@ export default function TextStyleSettings() {
                     >
                       <Type className="w-4 h-4" style={{ color: style.icon_color }} />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900">{style.name}</div>
-                      <div className="text-xs text-gray-500 font-mono truncate">
+                      <div className="text-xs text-gray-500 font-mono truncate max-w-[200px] sm:max-w-[300px]">
                         {style.html_template}
                       </div>
                     </div>
