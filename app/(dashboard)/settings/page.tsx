@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import CategorySettings from '@/components/settings/CategorySettings';
 import UserProfileSettings from '@/components/settings/UserProfileSettings';
+import TextStyleSettings from '@/components/settings/TextStyleSettings';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -23,6 +24,10 @@ export default async function SettingsPage() {
 
         <div className="bg-white rounded-lg shadow p-8">
           <CategorySettings />
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-8">
+          <TextStyleSettings />
         </div>
       </div>
 

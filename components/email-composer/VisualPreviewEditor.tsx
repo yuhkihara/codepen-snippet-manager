@@ -9,9 +9,10 @@
  * - Shadow DOM for style isolation
  * - Real-time sync with Monaco Editor via Zustand store
  * - Floating toolbar for text styling (Medium-style)
+ * - Customizable text styles from user settings
  */
 
-import { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { useState, useCallback, useRef, useEffect, memo, createContext, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import {
   DndContext,
@@ -33,9 +34,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useEmailComposerStore } from '@/store/emailComposerStore';
 import { sanitizeHTML } from '@/lib/sanitize';
+import { createClient } from '@/lib/supabase/client';
 import { Trash2, GripVertical, Undo, Redo, Bold, Type } from 'lucide-react';
+import { TextStyle } from '@/types';
 
-// ===== Floating Toolbar Types =====
+// ===== Style Options Types =====
 
 interface StyleOption {
   id: string;
@@ -44,7 +47,10 @@ interface StyleOption {
   htmlTemplate: string;
 }
 
-const STYLE_OPTIONS: StyleOption[] = [
+/**
+ * Default styles used when user has no custom styles
+ */
+const DEFAULT_STYLE_OPTIONS: StyleOption[] = [
   {
     id: 'bold',
     label: '太字',
@@ -64,6 +70,23 @@ const STYLE_OPTIONS: StyleOption[] = [
     htmlTemplate: '<span style="color:#0086ab;">{text}</span>',
   },
 ];
+
+/**
+ * Convert database TextStyle to StyleOption
+ */
+function textStyleToOption(style: TextStyle): StyleOption {
+  return {
+    id: style.id,
+    label: style.name,
+    icon: <Type className="w-4 h-4" style={{ color: style.icon_color }} />,
+    htmlTemplate: style.html_template,
+  };
+}
+
+// ===== Style Options Context =====
+// スタイルオプションをコンポーネントツリー全体で共有
+
+const StyleOptionsContext = createContext<StyleOption[]>(DEFAULT_STYLE_OPTIONS);
 
 // ===== Floating Toolbar Component =====
 
@@ -103,13 +126,16 @@ const FloatingToolbar = memo(function FloatingToolbar({
   const adjustedX = Math.min(position.x, window.innerWidth - 150);
   const adjustedY = Math.max(position.y - 45, 10);
 
+  // Contextからスタイルオプションを取得
+  const styleOptions = useContext(StyleOptionsContext);
+
   return createPortal(
     <div
       ref={toolbarRef}
       className="fixed z-[9999] bg-gray-900 rounded-lg shadow-xl flex items-center gap-1 px-2 py-1.5 animate-in fade-in zoom-in-95 duration-150"
       style={{ left: adjustedX, top: adjustedY }}
     >
-      {STYLE_OPTIONS.map((option) => (
+      {styleOptions.map((option) => (
         <button
           key={option.id}
           onMouseDown={(e) => {
@@ -312,7 +338,6 @@ const SortableComponent = memo(function SortableComponent({
 
     // 編集モード時は各contenteditable要素に直接イベントリスナーを付ける
     if (isEditing) {
-      console.log('[FloatingToolbar] isEditing=true, setting up event listeners');
       const editableTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'td', 'th', 'li', 'label'];
 
       editableTags.forEach((tag) => {
@@ -328,11 +353,9 @@ const SortableComponent = memo(function SortableComponent({
           if (isEditable) {
             const htmlEl = el as HTMLElement;
             htmlEl.contentEditable = 'true';
-            console.log('[FloatingToolbar] Made contenteditable:', htmlEl.tagName, htmlEl.textContent?.substring(0, 30));
 
             // マウスアップ時に選択を検出してツールバーを表示
             const handleMouseUp = () => {
-              console.log('[FloatingToolbar] mouseup fired on:', htmlEl.tagName);
               // 少し遅延させて選択が確定するのを待つ
               setTimeout(() => {
                 // Shadow DOM内の選択を取得
@@ -346,23 +369,13 @@ const SortableComponent = memo(function SortableComponent({
                   selection = document.getSelection();
                 }
 
-                console.log('[FloatingToolbar] selection:', selection);
-                console.log('[FloatingToolbar] isCollapsed:', selection?.isCollapsed);
-                console.log('[FloatingToolbar] rangeCount:', selection?.rangeCount);
-
                 if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
                   const range = selection.getRangeAt(0);
                   const selectedText = range.toString();
-                  console.log('[FloatingToolbar] selectedText:', selectedText);
 
                   if (selectedText && selectedText.trim()) {
                     // 選択範囲の位置を取得
                     const rect = range.getBoundingClientRect();
-                    console.log('[FloatingToolbar] rect:', rect);
-                    console.log('[FloatingToolbar] showing toolbar at:', {
-                      x: rect.left + rect.width / 2 - 50,
-                      y: rect.top,
-                    });
                     setToolbarState({
                       visible: true,
                       position: {
@@ -373,7 +386,6 @@ const SortableComponent = memo(function SortableComponent({
                     });
                   }
                 } else {
-                  console.log('[FloatingToolbar] no valid selection, hiding toolbar');
                   // 選択がない場合はツールバーを非表示
                   setToolbarState(prev => ({ ...prev, visible: false, range: null }));
                 }
@@ -584,6 +596,33 @@ export default function VisualPreviewEditor() {
   const [isExternalDragOver, setIsExternalDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
+  // カスタムスタイルをDBから読み込み
+  const [styleOptions, setStyleOptions] = useState<StyleOption[]>(DEFAULT_STYLE_OPTIONS);
+
+  useEffect(() => {
+    const loadCustomStyles = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('text_styles')
+        .select('*')
+        .order('sort_order');
+
+      if (error) {
+        console.error('Failed to load text styles:', error);
+        // エラー時はデフォルトスタイルを使用
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // カスタムスタイルがある場合はそれを使用
+        setStyleOptions(data.map(textStyleToOption));
+      }
+      // カスタムスタイルがない場合はデフォルトのまま
+    };
+
+    loadCustomStyles();
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -688,6 +727,7 @@ export default function VisualPreviewEditor() {
   }, [undo, redo]);
 
   return (
+    <StyleOptionsContext.Provider value={styleOptions}>
     <div className="h-full flex flex-col bg-gray-50">
       {/* ヘッダー */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
@@ -812,5 +852,6 @@ export default function VisualPreviewEditor() {
         </div>
       </div>
     </div>
+    </StyleOptionsContext.Provider>
   );
 }
